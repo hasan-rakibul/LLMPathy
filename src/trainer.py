@@ -9,7 +9,7 @@ def compute_metrics(eval_pred):
     pearsonr_metric = evaluate.load('pearsonr')
     logits, labels = eval_pred # unpack the tuple returned by the model
     pearsonr = pearsonr_metric.compute(predictions=logits, references=labels)
-    return {'pearsonr': pearsonr}
+    return pearsonr
 
 def train_model(config):
     datamodule = DataModule(config)
@@ -49,7 +49,8 @@ def train_model(config):
         seed=config.seed,
         fp16=config.train.fp16,
         gradient_checkpointing=config.train.gradient_checkpointing,
-        report_to='tensorboard'
+        report_to='tensorboard',
+        gradient_checkpointing_kwargs={'use_reentrant':False} # based on https://github.com/huggingface/transformers/issues/26969
     )
 
     trainer = Trainer(
