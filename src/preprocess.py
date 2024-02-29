@@ -1,0 +1,74 @@
+import pandas as pd
+from transformers import AutoTokenizer, DataCollatorWithPadding
+from datasets import Dataset
+
+class DataModule:
+    def __init__(self, config):
+
+        self.config = config
+        
+        self.tokeniser = AutoTokenizer.from_pretrained(
+                self.config.checkpoint,
+                use_fast=True,
+                add_prefix_space=True # the first word is tokenised differently if not a prefix space
+        )
+
+        if 'mistral' in self.config.checkpoint or 'llama' in self.config.checkpoint:
+            # the tokeniser for mistral and llama does not have the a default pad token
+            # so we use eos token as the pad token
+            self.tokeniser.pad_token_id = self.tokeniser.eos_token_id
+            self.tokeniser.pad_token = self.tokeniser.eos_token
+            
+        self.data_collator = DataCollatorWithPadding(tokenizer=self.tokeniser)
+    
+    def _read_and_process(self, path, send_label):
+        data = pd.read_csv(path, sep='\t')
+    
+        # keep only the relevant columns
+        # if we want to send the label, we need to include the annotation
+        if send_label:
+            data = data[self.config.data.feature_to_tokenise + self.config.data.demographics + self.config.data.annotation]
+        else:
+            data = data[self.config.data.feature_to_tokenise + self.config.data.demographics]
+
+        if len(self.config.data.demographics): # if there are demographics
+            from sklearn.preprocessing import MinMaxScaler
+            data_demog = data[self.config.data.demographics]
+            scaler = MinMaxScaler()
+            data_demog = pd.DataFrame(
+                scaler.fit_transform(data_demog),
+                columns=self.config.data.demographics
+            )
+            # drop the original demographics and replace with the scaled one
+            data = data.drop(columns=self.config.data.demographics)
+            data = pd.concat([data, data_demog], axis=1)
+
+        return data
+
+    def _tokeniser_fn(self, sentence):
+        if len(self.config.data.feature_to_tokenise) == 1: # only one feature
+            return self.tokeniser(
+                sentence[self.config.data.feature_to_tokenise[0]],
+                truncation=True,
+                max_length=self.config.data.max_length
+            )
+        # otherwise tokenise a pair of sentence
+        return self.tokeniser(
+            sentence[self.config.data.feature_to_tokenise[0]],
+            sentence[self.config.data.feature_to_tokenise[1]],
+            truncation=True,
+            max_length=self.config.data.max_length
+        )
+
+    def _process_input(self, data_file, send_label):
+        data = self._read_and_process(path=data_file, send_label=send_label)
+        data = Dataset.from_pandas(data, preserve_index=False) # convert to huggingface dataset
+        data = data.map(self._tokeniser_fn, batched=True, remove_columns=self.config.data.feature_to_tokenise) # tokenise
+        data = data.rename_column(self.config.data.annotation[0], 'labels') # TODO: did not consider multiple annotations
+        data.set_format('torch')
+        return data 
+
+    def get_huggingface_data(self, data_file, send_label):
+        data = self._process_input(data_file=data_file, send_label=send_label)
+        return data
+        

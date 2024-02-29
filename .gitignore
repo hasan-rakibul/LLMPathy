@@ -1,3 +1,11 @@
+OTHERS/
+src/draft.ipynb
+data/
+logs/
+output/
+
+make_env_ready.sh
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
