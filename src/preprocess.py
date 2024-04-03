@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from transformers import AutoTokenizer, DataCollatorWithPadding
 from datasets import Dataset
@@ -64,11 +65,40 @@ class DataModule:
         data = self._read_and_process(path=data_file, send_label=send_label)
         data = Dataset.from_pandas(data, preserve_index=False) # convert to huggingface dataset
         data = data.map(self._tokeniser_fn, batched=True, remove_columns=self.config.data.feature_to_tokenise) # tokenise
-        data = data.rename_column(self.config.data.annotation[0], 'labels') # TODO: did not consider multiple annotations
-        data.set_format('torch')
+        data = data.rename_column(self.config.data.annotation[0], 'labels') # TODO: maybe, did not consider multiple annotations
+        data.set_format('torch', device='cuda')
         return data 
 
     def get_huggingface_data(self, data_file, send_label):
         data = self._process_input(data_file=data_file, send_label=send_label)
         return data
+
+
+class SSLDataModule(DataModule):
+    def __init__(self, config):
+        super().__init__(config)
+
+    def _process_input(self, data_file, send_label):
+        data = self._read_and_process(path=data_file, send_label=send_label)
+        matched_filter = np.abs(data["crowdsourced_empathy"] - data["gpt_empathy"]) < self.config.data.ssl_threshold
+        data_labelled = data[matched_filter]
+        data_unlabelled = data[~matched_filter]
+
+        data_labelled["labels"] = data_labelled[["crowdsourced_empathy", "gpt_empathy"]].mean(axis=1)
+        data_labelled.drop(columns=["crowdsourced_empathy", "gpt_empathy"], inplace=True)
+        data_unlabelled.drop(columns=["crowdsourced_empathy", "gpt_empathy"], inplace=True)
+
+        data_labelled = Dataset.from_pandas(data_labelled, preserve_index=False)
+        data_unlabelled = Dataset.from_pandas(data_unlabelled, preserve_index=False)
         
+        data_labelled = data_labelled.map(self._tokeniser_fn, batched=True, remove_columns=self.config.data.feature_to_tokenise)
+        data_unlabelled = data_unlabelled.map(self._tokeniser_fn, batched=True, remove_columns=self.config.data.feature_to_tokenise)
+
+        data_labelled.set_format('torch', device='cuda')
+        data_unlabelled.set_format('torch', device='cuda')
+
+        return data_labelled, data_unlabelled
+    
+    def get_huggingface_data(self, data_file, send_label):
+        data_labelled, data_unlabelled = self._process_input(data_file=data_file, send_label=send_label)
+        return data_labelled, data_unlabelled

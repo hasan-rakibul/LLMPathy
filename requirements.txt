@@ -1,7 +1,8 @@
-# python 3.12.1
+# python 3.10.12
 torch
 transformers
 datasets
+sentencepiece
 peft
 evaluate
 tensorboard
@@ -10,3 +11,10 @@ numpy
 matplotlib
 scienceplots
 omegaconf
+
+# UCVME
+click
+scikit-learn
+torchvision
+opencv-python
+scikit-image
