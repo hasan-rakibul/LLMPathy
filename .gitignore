@@ -7,7 +7,7 @@ tmp/
 
 load_modules.sh
 req_resources.sh
-make_env_ready.sh
+.make_env_ready.sh
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

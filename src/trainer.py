@@ -12,6 +12,7 @@ def compute_metrics(eval_pred):
     return pearsonr
 
 def train_model(config):
+    # os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
     datamodule = DataModule(config)
     train_data = datamodule.get_huggingface_data(
         data_file=config.data.train_file, 
@@ -34,7 +35,7 @@ def train_model(config):
         lr_scheduler_type=config.train.lr_scheduler_type,
         warmup_ratio=config.train.warmup_ratio,
         max_grad_norm=config.train.max_grad_norm,
-        num_train_epochs=config.train.num_train_epochs,
+        num_train_epochs=config.train.num_epochs,
         per_device_train_batch_size=config.train.batch_size,
         per_device_eval_batch_size=config.train.batch_size,
         weight_decay=config.train.weight_decay,
@@ -50,7 +51,7 @@ def train_model(config):
         fp16=config.train.fp16,
         gradient_checkpointing=config.train.gradient_checkpointing,
         report_to='tensorboard',
-        gradient_checkpointing_kwargs={'use_reentrant':False} # based on https://github.com/huggingface/transformers/issues/26969
+        gradient_checkpointing_kwargs={'use_reentrant':True} # recompute the forward pass if True
     )
 
     trainer = Trainer(

@@ -24,11 +24,7 @@ def plot(x, y, y2=None, xlabel=None, ylabel=None, legend=[], save=False, filenam
         
     fig.show()
 
-
-def get_device(device_id=0):
-    return torch.device("cuda", device_id) if torch.cuda.is_available() else torch.device("cpu")
-
-def set_all_seeds(seed):
+def seed_everything(seed):
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)

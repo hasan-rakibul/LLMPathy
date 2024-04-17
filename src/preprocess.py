@@ -1,5 +1,10 @@
+import random
 import numpy as np
 import pandas as pd
+
+import torch
+from torch.utils.data import DataLoader
+
 from transformers import AutoTokenizer, DataCollatorWithPadding
 from datasets import Dataset
 
@@ -22,13 +27,13 @@ class DataModule:
             
         self.data_collator = DataCollatorWithPadding(tokenizer=self.tokeniser)
     
-    def _read_and_process(self, path, send_label):
+    def _read_and_process(self, path, send_label, annotation):
         data = pd.read_csv(path, sep='\t')
     
         # keep only the relevant columns
         # if we want to send the label, we need to include the annotation
         if send_label:
-            data = data[self.config.data.feature_to_tokenise + self.config.data.demographics + self.config.data.annotation]
+            data = data[self.config.data.feature_to_tokenise + self.config.data.demographics + annotation]
         else:
             data = data[self.config.data.feature_to_tokenise + self.config.data.demographics]
 
@@ -62,16 +67,39 @@ class DataModule:
         )
 
     def _process_input(self, data_file, send_label):
-        data = self._read_and_process(path=data_file, send_label=send_label)
+        data = self._read_and_process(path=data_file, send_label=send_label, annotation=['crowdsourced_empathy'])
         data = Dataset.from_pandas(data, preserve_index=False) # convert to huggingface dataset
         data = data.map(self._tokeniser_fn, batched=True, remove_columns=self.config.data.feature_to_tokenise) # tokenise
-        data = data.rename_column(self.config.data.annotation[0], 'labels') # TODO: maybe, did not consider multiple annotations
-        data.set_format('torch', device='cuda')
+        data = data.rename_column('crowdsourced_empathy', 'labels')
+        data.set_format('torch')
         return data 
 
     def get_huggingface_data(self, data_file, send_label):
         data = self._process_input(data_file=data_file, send_label=send_label)
         return data
+    
+    # taken from https://pytorch.org/docs/stable/notes/randomness.html
+    def _seed_worker(self, worker_id):
+        worker_seed = torch.initial_seed() % 2**32
+        np.random.seed(worker_seed)
+        random.seed(worker_seed) 
+    
+    def get_dataloader(self, data_file, send_label, shuffle):
+        # making sure the shuffling is reproducible
+        g = torch.Generator()
+        g.manual_seed(self.config.seed)
+
+        data = self.get_huggingface_data(data_file=data_file, send_label=send_label)
+        return DataLoader(
+            data, 
+            batch_size=self.config.train.batch_size, 
+            shuffle=shuffle,
+            collate_fn=self.data_collator,
+            num_workers=self.config.num_workers,
+            pin_memory=torch.cuda.is_available(),
+            worker_init_fn=self._seed_worker,
+            generator=g
+        )
 
 
 class SSLDataModule(DataModule):
@@ -79,14 +107,16 @@ class SSLDataModule(DataModule):
         super().__init__(config)
 
     def _process_input(self, data_file, send_label):
-        data = self._read_and_process(path=data_file, send_label=send_label)
+        data = self._read_and_process(path=data_file, send_label=send_label, annotation=['crowdsourced_empathy', 'gpt_empathy'])
         matched_filter = np.abs(data["crowdsourced_empathy"] - data["gpt_empathy"]) < self.config.data.ssl_threshold
         data_labelled = data[matched_filter]
         data_unlabelled = data[~matched_filter]
 
         data_labelled["labels"] = data_labelled[["crowdsourced_empathy", "gpt_empathy"]].mean(axis=1)
         data_labelled.drop(columns=["crowdsourced_empathy", "gpt_empathy"], inplace=True)
-        data_unlabelled.drop(columns=["crowdsourced_empathy", "gpt_empathy"], inplace=True)
+
+        data_unlabelled["labels"] = data_unlabelled[["crowdsourced_empathy"]]
+        data_unlabelled.drop(columns=["gpt_empathy"], inplace=True)
 
         data_labelled = Dataset.from_pandas(data_labelled, preserve_index=False)
         data_unlabelled = Dataset.from_pandas(data_unlabelled, preserve_index=False)
@@ -94,11 +124,40 @@ class SSLDataModule(DataModule):
         data_labelled = data_labelled.map(self._tokeniser_fn, batched=True, remove_columns=self.config.data.feature_to_tokenise)
         data_unlabelled = data_unlabelled.map(self._tokeniser_fn, batched=True, remove_columns=self.config.data.feature_to_tokenise)
 
-        data_labelled.set_format('torch', device='cuda')
-        data_unlabelled.set_format('torch', device='cuda')
+        data_labelled.set_format('torch')
+        data_unlabelled.set_format('torch')
 
         return data_labelled, data_unlabelled
     
     def get_huggingface_data(self, data_file, send_label):
         data_labelled, data_unlabelled = self._process_input(data_file=data_file, send_label=send_label)
         return data_labelled, data_unlabelled
+    
+    def get_dataloader(self, data_file, send_label, shuffle):
+        g = torch.Generator()
+        g.manual_seed(self.config.seed)
+
+        data_labelled, data_unlabelled = self.get_huggingface_data(data_file=data_file, send_label=send_label)
+        dataloader_labelled = DataLoader(
+            data_labelled, 
+            batch_size=self.config.train.batch_size, 
+            shuffle=shuffle,
+            collate_fn=self.data_collator,
+            num_workers=self.config.num_workers,
+            pin_memory=torch.cuda.is_available(),
+            worker_init_fn=self._seed_worker,
+            generator=g
+        )
+
+        dataloader_unlabelled = DataLoader(
+            data_unlabelled, 
+            batch_size=self.config.train.batch_size, 
+            shuffle=shuffle,
+            collate_fn=self.data_collator,
+            num_workers=self.config.num_workers,
+            pin_memory=torch.cuda.is_available(),
+            worker_init_fn=self._seed_worker,
+            generator=g
+        )
+
+        return dataloader_labelled, dataloader_unlabelled

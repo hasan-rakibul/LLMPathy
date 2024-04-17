@@ -1,5 +1,6 @@
 from transformers import AutoModelForSequenceClassification
 from peft import get_peft_model, LoraConfig, TaskType
+from torch import nn
 
 def get_model(config):
     if 'roberta' in config.checkpoint:
@@ -55,3 +56,29 @@ def get_model(config):
   
     model = get_peft_model(model, peft_config)
     return model
+
+class SSLRoberta(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+        self.transformer = AutoModelForSequenceClassification.from_pretrained(
+            config.checkpoint,
+            num_labels=768
+        )
+
+        self.fc_m = nn.Linear(768, 1)
+        self.fc_v = nn.Linear(768, 1)
+
+    def forward(self, input_ids, attention_mask):
+        outputs = self.transformer(
+            input_ids=input_ids,
+            attention_mask=attention_mask
+        )
+
+        x_feat_m = nn.functional.dropout(outputs.logits, p=self.config.train.dropout, training=True)
+        x_feat_v = nn.functional.dropout(outputs.logits, p=self.config.train.dropout, training=True)
+
+        m = self.fc_m(x_feat_m)
+        v = self.fc_v(x_feat_v)
+
+        return m, v
