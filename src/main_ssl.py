@@ -1,11 +1,10 @@
-import math
 import os
 import time
 import datetime
 
 import numpy as np
 import pandas as pd
-import sklearn.metrics
+from scipy.stats import pearsonr
 import torch
 import tqdm
 
@@ -17,8 +16,6 @@ from utils import seed_everything
 
 def main(
     w_ulb = 10,
-    y_mean = 35,
-    y_std = 11,
     samp_ssl = 5
 ):
     pd.options.mode.copy_on_write = True # to avoid SettingWithCopyWarning; details: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
@@ -32,7 +29,7 @@ def main(
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
     dm_ssl = SSLDataModule(config)
-    train_dl_labelled, train_dl_unlabelled = dm_ssl.get_dataloader(
+    train_dl_labelled, train_dl_unlabelled, y_mean, y_std = dm_ssl.get_dataloader(
         data_file=config.data.train_file,
         send_label=True,
         shuffle=False
@@ -55,12 +52,14 @@ def main(
     seed_everything(config.seed)
 
     output = os.path.join("output", datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
-    os.makedirs(output, exist_ok = True)
+    os.makedirs(output, exist_ok=True)
 
-    optim = torch.optim.Adam(model.parameters(), lr=config.train.lr, weight_decay=config.train.weight_decay)
+    optim = torch.optim.Adam(model.parameters(), lr=config.train.lr, 
+                             weight_decay=config.train.weight_decay)
     scheduler = torch.optim.lr_scheduler.StepLR(optim, config.train.lr_step_period)
 
-    optim_1 = torch.optim.Adam(model_1.parameters(), lr=config.train.lr, weight_decay=config.train.weight_decay)
+    optim_1 = torch.optim.Adam(model_1.parameters(), lr=config.train.lr, 
+                               weight_decay=config.train.weight_decay)
     scheduler_1 = torch.optim.lr_scheduler.StepLR(optim_1, config.train.lr_step_period)
 
     with open(os.path.join(output, "log.csv"), "a") as f:
@@ -100,27 +99,31 @@ def main(
                 #         torch.cuda.reset_peak_memory_stats(i)
                 
                 if phase == "train":
-                    loss_tr, loss_reg_0, loss_reg_1, cps, cps_l, cps_s, yhat_0, yhat_1, y, mean_0_ls, mean_1_ls, var_0_ls, var_1_ls = run_epoch(model, 
-                                                                                                                                model_1, 
-                                                                                                                                train_dl_labelled, 
-                                                                                                                                train_dl_unlabelled, 
-                                                                                                                                phase == "train", 
-                                                                                                                                optim, 
-                                                                                                                                optim_1,
-                                                                                                                                device=device,
-                                                                                                                                w_ulb = w_ulb, 
-                                                                                                                                y_mean = y_mean, 
-                                                                                                                                y_std = y_std,
-                                                                                                                                samp_ssl = samp_ssl)
+                    loss_tr, loss_reg_0, loss_reg_1, cps, cps_l, cps_s,\
+                    yhat_0, yhat_1, y, mean_0_ls, mean_1_ls, var_0_ls, var_1_ls \
+                        = run_epoch(
+                            model, 
+                            model_1, 
+                            train_dl_labelled, 
+                            train_dl_unlabelled, 
+                            phase == "train", # means train = True
+                            optim, 
+                            optim_1,
+                            device=device,
+                            w_ulb=w_ulb, 
+                            y_mean=y_mean, 
+                            y_std=y_std,
+                            samp_ssl=samp_ssl
+                        )
 
-                    r2_value_0 = sklearn.metrics.r2_score(y, yhat_0)
-                    r2_value_1 = sklearn.metrics.r2_score(y, yhat_1)
+                    pcc_0 = pearsonr(y, yhat_0)[0] # [0] is the correlation coefficient statistic, [1] is the p-value
+                    pcc_1 = pearsonr(y, yhat_1)[0]
 
                     f.write("{},{},{},{},{},{},{},{},{},{},{},{}\n".format(epoch,
                                                                 phase,
                                                                 loss_tr,
-                                                                r2_value_0,
-                                                                r2_value_1,
+                                                                pcc_0,
+                                                                pcc_1,
                                                                 time.time() - start_time,
                                                                 y.size,
                                                                 sum(torch.cuda.max_memory_allocated() for i in range(torch.cuda.device_count())),
@@ -166,7 +169,7 @@ def main(
                         samp_ssl = samp_ssl
                     )
 
-                    r2_value = sklearn.metrics.r2_score(y, yhat)
+                    pcc = pearsonr(y, yhat)[0]
                     loss = loss_valit
 
                     with open(os.path.join(output, "z_{}_epch{}_prd.csv".format(phase, epoch)), "a") as pred_out:
@@ -197,7 +200,7 @@ def main(
                     f.write("{},{},{},{},{},{},{},{},{},{},{}".format(epoch,
                                                                 phase,
                                                                 loss,
-                                                                r2_value,
+                                                                pcc,
                                                                 time.time() - start_time,
                                                                 y.size,
                                                                 sum(torch.cuda.max_memory_allocated() for i in range(torch.cuda.device_count())),
@@ -225,7 +228,7 @@ def main(
                 'best_loss': bestLoss,
                 'loss': loss,
                 "best_model_loss": best_model_loss,
-                'r2': r2_value,
+                'pcc': pcc,
                 'opt_dict': optim.state_dict(),
                 'scheduler_dict': scheduler.state_dict(),
                 'opt_dict_1': optim_1.state_dict(),
@@ -247,7 +250,7 @@ def main(
             model.load_state_dict(checkpoint['state_dict'], strict = False)
             model_1.load_state_dict(checkpoint['state_dict_1'], strict = False)
 
-            f.write("Best validation loss {} from epoch {}, R2 {}\n".format(checkpoint["best_model_loss"], checkpoint["epoch"], checkpoint["r2"]))
+            f.write("Best validation loss {} from epoch {}, PCC {}\n".format(checkpoint["best_model_loss"], checkpoint["epoch"], checkpoint["pcc"]))
             f.flush()
 
 
@@ -259,10 +262,10 @@ def run_epoch(model,
             optim, 
             optim_1,
             device,
-            w_ulb = 10,  
-            y_mean = 35, 
-            y_std = 11,
-            samp_ssl = 5):
+            w_ulb,  
+            y_mean, 
+            y_std,
+            samp_ssl):
     
     model.train(train)
     model_1.train(train)
@@ -464,15 +467,17 @@ def run_epoch(model,
 
     return total / n, total_reg / n, total_reg_1 / n, total_cps / n, total_cps_0 / n, total_cps_1 / n, yhat_0, yhat_1, y, mean2s_0_stack_ls, mean2s_1_stack_ls, var1s_0_stack_ls, var1s_1_stack_ls
 
-def run_epoch_val(model, 
-                model_1, 
-                dataloader, 
-                train, 
-                optim,
-                device,
-                y_mean = 35, 
-                y_std = 11, 
-                samp_ssl = 5):
+def run_epoch_val(
+        model, 
+        model_1, 
+        dataloader, 
+        train, 
+        optim,
+        device,
+        y_mean, 
+        y_std, 
+        samp_ssl
+    ):
 
 
     model.train(False)

@@ -138,6 +138,10 @@ class SSLDataModule(DataModule):
         g.manual_seed(self.config.seed)
 
         data_labelled, data_unlabelled = self.get_huggingface_data(data_file=data_file, send_label=send_label)
+        
+        y_mean = data_labelled["labels"].mean().item()
+        y_std = data_labelled["labels"].std().item()
+
         dataloader_labelled = DataLoader(
             data_labelled, 
             batch_size=self.config.train.batch_size, 
@@ -160,4 +164,4 @@ class SSLDataModule(DataModule):
             generator=g
         )
 
-        return dataloader_labelled, dataloader_unlabelled
+        return dataloader_labelled, dataloader_unlabelled, y_mean, y_std

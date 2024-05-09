@@ -1,5 +1,4 @@
-# python 3.10.12
-torch
+# python 3.12.3
 transformers
 datasets
 sentencepiece
@@ -12,9 +11,4 @@ matplotlib
 scienceplots
 omegaconf
 
-# UCVME
-click
 scikit-learn
-torchvision
-opencv-python
-scikit-image

@@ -1,5 +1,4 @@
 OTHERS/
-src/draft.ipynb
 data/
 logs/
 output/
@@ -8,6 +7,8 @@ tmp/
 load_modules.sh
 req_resources.sh
 .make_env_ready.sh
+
+.python-version
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
