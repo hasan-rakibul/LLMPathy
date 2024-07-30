@@ -1,7 +1,7 @@
 expt_name: LLMPathy_1GPU
 seed: 42
 num_workers: 12
-cuda_visible_devices: 2, 6
+cuda_visible_devices: 4, 5
 
 checkpoint: roberta-base
 # checkpoint: mistralai/Mistral-7B-v0.1
@@ -16,7 +16,7 @@ data:
   ssl_threshold: 0.5
 
 train:
-  num_epochs: 50
+  num_epochs: 1
   output_dir: ./output
   logging_dir: ./logs
   lr: 1.0e-4

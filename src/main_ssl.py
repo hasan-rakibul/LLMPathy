@@ -10,16 +10,18 @@ import tqdm
 
 import omegaconf
 
+from torch.utils.tensorboard import SummaryWriter
+
 from preprocess import SSLDataModule, DataModule
 from model import SSLRoberta
 from utils import seed_everything
 
 def main(
-    w_ulb = 10,
-    samp_ssl = 5
+    w_ulb=10,
+    samp_ssl=5
 ):
     pd.options.mode.copy_on_write = True # to avoid SettingWithCopyWarning; details: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
-    
+
     config_file = "config/config.yaml"
     config = omegaconf.OmegaConf.load(config_file)
 
@@ -27,6 +29,18 @@ def main(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+    # Seed RNGs
+    seed_everything(config.seed)
+
+    time_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    writer = SummaryWriter(log_dir=os.path.join(config.train.logging_dir, time_str))
+    # add config to tensorboard
+    writer.add_text("config", omegaconf.OmegaConf.to_yaml(config))
+
+    output = os.path.join(config.train.output_dir, time_str)
+    os.makedirs(output, exist_ok=True)
 
     dm_ssl = SSLDataModule(config)
     train_dl_labelled, train_dl_unlabelled, y_mean, y_std = dm_ssl.get_dataloader(
@@ -47,12 +61,6 @@ def main(
 
     model = model.to(device)
     model_1 = model_1.to(device)
-
-    # Seed RNGs
-    seed_everything(config.seed)
-
-    output = os.path.join("output", datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
-    os.makedirs(output, exist_ok=True)
 
     optim = torch.optim.Adam(model.parameters(), lr=config.train.lr, 
                              weight_decay=config.train.weight_decay)
@@ -86,7 +94,7 @@ def main(
             bestLoss = checkpoint["best_loss"]
             f.write("Resuming from epoch {}\n".format(epoch_resume))
         except FileNotFoundError:
-            f.write("Starting run from scratch\n")
+            f.write("Training from scratch\n")
 
         for epoch in range(epoch_resume, config.train.num_epochs):
             print("Epoch #{}".format(epoch), flush=True)
@@ -119,45 +127,13 @@ def main(
                     pcc_0 = pearsonr(y, yhat_0)[0] # [0] is the correlation coefficient statistic, [1] is the p-value
                     pcc_1 = pearsonr(y, yhat_1)[0]
 
-                    f.write("{},{},{},{},{},{},{},{},{},{},{},{}\n".format(epoch,
-                                                                phase,
-                                                                loss_tr,
-                                                                pcc_0,
-                                                                pcc_1,
-                                                                time.time() - start_time,
-                                                                y.size,
-                                                                sum(torch.cuda.max_memory_allocated() for i in range(torch.cuda.device_count())),
-                                                                sum(torch.cuda.max_memory_reserved() for i in range(torch.cuda.device_count())),
-                                                                config.train.batch_size,
-                                                                loss_reg_0,
-                                                                cps))
+                    writer.add_scalar("Loss/train", loss_tr, epoch)     
+
+                    f.write("{},{},{},{},{},{},{},{}\n".format(epoch, phase, loss_tr, pcc_0, pcc_1, time.time() - start_time, loss_reg_0, cps))
                     f.flush()
                 
-                    with open(os.path.join(output, "train_pred_{}.csv".format(epoch)), "w") as f_trnpred:
-                        for clmn in range(mean_0_ls.shape[1]):
-                            f_trnpred.write("m_0_{},".format(clmn))
-                        for clmn in range(mean_1_ls.shape[1]):
-                            f_trnpred.write("m_1_{},".format(clmn))
-                        for clmn in range(var_0_ls.shape[1]):
-                            f_trnpred.write("v_0_{},".format(clmn))
-                        for clmn in range(var_1_ls.shape[1]):
-                            f_trnpred.write("v_1_{},".format(clmn))
-                        f_trnpred.write("\n".format(clmn))
-                        
-                        for rw in range(mean_0_ls.shape[0]):
-                            for clmn in range(mean_0_ls.shape[1]):
-                                f_trnpred.write("{},".format(mean_0_ls[rw, clmn]))
-                            for clmn in range(mean_1_ls.shape[1]):
-                                f_trnpred.write("{},".format(mean_1_ls[rw, clmn]))
-                            for clmn in range(var_0_ls.shape[1]):
-                                f_trnpred.write("{},".format(var_0_ls[rw, clmn]))
-                            for clmn in range(var_1_ls.shape[1]):
-                                f_trnpred.write("{},".format(var_1_ls[rw, clmn]))
-                            f_trnpred.write("\n".format(clmn))
-
-                
                 else:
-                    loss_valit, yhat, y, var_hat, var_e, var_a, mean_0_ls, var_0_ls = run_epoch_val(
+                    loss_val, yhat, y, var_hat, var_e, var_a, mean_0_ls, var_0_ls = run_epoch_val(
                         model = model, 
                         model_1 = model_1, 
                         dataloader = val_dl, 
@@ -170,64 +146,25 @@ def main(
                     )
 
                     pcc = pearsonr(y, yhat)[0]
-                    loss = loss_valit
 
-                    with open(os.path.join(output, "z_{}_epch{}_prd.csv".format(phase, epoch)), "a") as pred_out:
-                        pred_out.write("yhat,y,var_hat, var_e, var_a\n")
-                        for pred_itr in range(y.shape[0]):
-                            pred_out.write("{},{},{},{},{}\n".format(yhat[pred_itr],
-                            y[pred_itr], 
-                            var_hat[pred_itr], 
-                            var_e[pred_itr], 
-                            var_a[pred_itr]))
-                        pred_out.flush()
-                    
-                    with open(os.path.join(output, "val_predmcd0_{}.csv".format(epoch)), "w") as f_trnpred:
-                        for clmn in range(mean_0_ls.shape[1]):
-                            f_trnpred.write("m_0_{},".format(clmn))
-                        for clmn in range(var_0_ls.shape[1]):
-                            f_trnpred.write("v_0_{},".format(clmn))
-                        f_trnpred.write("\n".format(clmn))
-                        
-                        for rw in range(mean_0_ls.shape[0]):
-                            for clmn in range(mean_0_ls.shape[1]):
-                                f_trnpred.write("{},".format(mean_0_ls[rw, clmn]))
-                            for clmn in range(var_0_ls.shape[1]):
-                                f_trnpred.write("{},".format(var_0_ls[rw, clmn]))
-                            f_trnpred.write("\n".format(clmn))
+                    writer.add_scalar("Loss/val", loss_val, epoch)
+                    writer.add_scalar("PCC/val", pcc, epoch)
 
-
-                    f.write("{},{},{},{},{},{},{},{},{},{},{}".format(epoch,
-                                                                phase,
-                                                                loss,
-                                                                pcc,
-                                                                time.time() - start_time,
-                                                                y.size,
-                                                                sum(torch.cuda.max_memory_allocated() for i in range(torch.cuda.device_count())),
-                                                                sum(torch.cuda.max_memory_reserved() for i in range(torch.cuda.device_count())),
-                                                                config.train.batch_size,
-                                                                0,
-                                                                0))
-            
-                    
+                    f.write("{},{},{}".format(epoch, loss_val, time.time() - start_time))                    
 
                     f.write("\n")
                     f.flush()
-
-
             
             scheduler.step()
             scheduler_1.step()
-
-            best_model_loss = loss_valit
 
             save = {
                 'epoch': epoch,
                 'state_dict': model.state_dict(),
                 'state_dict_1': model_1.state_dict(),
                 'best_loss': bestLoss,
-                'loss': loss,
-                "best_model_loss": best_model_loss,
+                'loss_tr': loss_tr,
+                "loss_val": loss_val,
                 'pcc': pcc,
                 'opt_dict': optim.state_dict(),
                 'scheduler_dict': scheduler.state_dict(),
@@ -238,11 +175,10 @@ def main(
             }
             torch.save(save, os.path.join(output, "checkpoint.pt"))
             
-            if best_model_loss < bestLoss:
-                print("saved best because {} < {}".format(best_model_loss, bestLoss))
+            if loss_val < bestLoss:
+                print("saved best because {} < {}".format(loss_val, bestLoss))
                 torch.save(save, os.path.join(output, "best.pt"))
-                bestLoss = best_model_loss
-
+                bestLoss = loss_val
 
         # Load best weights
         if config.train.num_epochs != 0:
@@ -250,9 +186,11 @@ def main(
             model.load_state_dict(checkpoint['state_dict'], strict = False)
             model_1.load_state_dict(checkpoint['state_dict_1'], strict = False)
 
-            f.write("Best validation loss {} from epoch {}, PCC {}\n".format(checkpoint["best_model_loss"], checkpoint["epoch"], checkpoint["pcc"]))
+            f.write("Best validation loss {} from epoch {}, PCC {}\n".format(checkpoint["loss_val"], checkpoint["epoch"], checkpoint["pcc"]))
             f.flush()
 
+    writer.flush()
+    writer.close()
 
 def run_epoch(model, 
             model_1, 
