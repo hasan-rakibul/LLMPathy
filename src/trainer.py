@@ -46,6 +46,7 @@ def train_model(config, model, train_dataset, datamodule):
 
     if config.train.checkpoint_dir:
         checkpoint = resolve_checkpoint(config.train.checkpoint_dir)
+        print(f"\nResuming from checkpoint: {checkpoint}")
         trainer.train(resume_from_checkpoint=checkpoint)
     else:
         trainer.train()
@@ -109,12 +110,13 @@ def k_fold_cross_validation(config, train_dataset, datamodule):
     sample_index = []
     ground_truth = []
 
+    raw_logging_dir = config.train.logging_dir
     for fold, (train_index, val_index) in enumerate(kf.split(train_dataset)):
         train_dataset = train_dataset.select(train_index)
         val_dataset = train_dataset.select(val_index)
 
         # customise logging_dir per fold
-        config.train.logging_dir = os.path.join(config.train.logging_dir, f"fold_{fold}")
+        config.train.logging_dir = os.path.join(raw_logging_dir, f"fold_{fold}")
         trainer = train_validate_model(config, model, train_dataset, val_dataset, datamodule)
         
         # Evaluate the trained model on the validation dataset
@@ -168,7 +170,7 @@ def find_noisy_samples_mcd(config, train_dataset, datamodule):
     model = model.cuda()
 
     trainer = train_model(config, model, train_dataset, datamodule)
-    
+
     # Use DataLoader for the training set
     train_dataloader = trainer.get_eval_datasetloader(train_dataset)
 
@@ -200,34 +202,35 @@ def find_noisy_samples_agentic(config, train_dataset, datamodule):
     models = [get_model(config).cuda() for _ in range(config.train.num_agents)]
     all_errors = np.zeros((config.train.num_agents, len(train_dataset)))
 
+    raw_logging_dir = config.train.logging_dir # so that we don't nest
+    raw_checkpoint_dir = config.train.checkpoint_dir
     for i, model in enumerate(models):
         # customise logging_dir per agent
-        config.train.logging_dir = os.path.join(config.train.logging_dir, f"agent_{i}")
+        config.train.logging_dir = os.path.join(raw_logging_dir, f"agent_{i}")
         if config.train.checkpoint_dir:
             # customise checkpoint_dir per agent. Assume each agent has only one checkpoint
-            config.train.checkpoint_dir = os.path.join(config.train.checkpoint_dir, f"agent_{i}")
+            config.train.checkpoint_dir = os.path.join(raw_checkpoint_dir, f"agent_{i}")
         trainer = train_model(config, model, train_dataset, datamodule)
         all_errors[i, :] = get_sample_wise_errors(train_dataset, trainer)
 
-    low_thres, high_thres = np.percentile(all_errors, [25, 75], axis=1) # agent-wise
+    threshold = np.percentile(all_errors, config.data.noise_level, axis=1) # agent-wise
     hc_index, mc_index, lc_index = [], [], []
 
     for i in range(all_errors.shape[1]): # iter over samples
         errors = all_errors[:, i] # errors of all agents for a sample
 
         # count the number of agents that agree on HC and LC
-        hc_count = np.sum(errors < low_thres)
-        lc_count = np.sum(errors > high_thres)
+        hc_count = np.sum(errors < threshold)
 
         if hc_count == config.train.num_agents: # all agents agree for HC
             hc_index.append(i)
-        elif lc_count == config.train.num_agents: # all agents agree for LC
+        elif hc_count == 0: # no agent agrees for HC --> all agree for LC
             lc_index.append(i)
         else:
-            mc_index.append(i) # disagreement
+            mc_index.append(i) # Mixed agreements
     
     # save indices
-    np.save(os.path.join(config.train.logging_dir, "hc_index.npy"), hc_index)
-    np.save(os.path.join(config.train.logging_dir, "mc_index.npy"), mc_index)
-    np.save(os.path.join(config.train.logging_dir, "lc_index.npy"), lc_index)
+    np.save(os.path.join(raw_logging_dir, "hc_index_" + str(config.data.noise_level) + ".npy"), hc_index)
+    np.save(os.path.join(raw_logging_dir, "mc_index_" + str(config.data.noise_level) + ".npy"), mc_index)
+    np.save(os.path.join(raw_logging_dir, "lc_index_" + str(config.data.noise_level) + ".npy"), lc_index)
     

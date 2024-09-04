@@ -1,9 +1,9 @@
 # expt_name: Baseline-RoBERTa-GoodSamples
 # expt_name: RoBERTa-SSL-Old2New
-expt_name: DetectNoiseLabels_MCD_No_LoRA
+expt_name: DetectNoiseLabels_Agentic
 seed: 42
 num_workers: 12
-cuda_visible_devices: 2, 3
+cuda_visible_devices: 2,
 
 checkpoint: roberta-base
 # checkpoint: mistralai/Mistral-7B-v0.1
@@ -20,13 +20,14 @@ data:
   demographics: []
   # demographics: ['gender', 'education', 'race', 'age', 'income']
   ssl_threshold: 0.5
+  noise_level: 20
 
 train:
   num_epochs: 20
   num_agents: 5
   logging_dir: ./logs
-  checkpoint_dir: False
-  # checkpoint_dir: ./logs/20240904_153353_DetectNoiseLabels_MCD_No_LoRA/
+  # checkpoint_dir: False
+  checkpoint_dir: ./logs/20240904_193336_DetectNoiseLabels_Agentic/
   lr: 1.0e-4
   lr_scheduler_type: constant
   lr_step_period: 10
