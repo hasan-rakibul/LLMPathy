@@ -1,3 +1,4 @@
+import os
 import matplotlib.pyplot as plt
 import scienceplots
 
@@ -28,3 +29,9 @@ def seed_everything(seed):
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
+
+def resolve_checkpoint(checkpoint_dir):
+    items = os.listdir(checkpoint_dir)
+    checkpoint = [item for item in items if item.startswith("checkpoint")]
+    assert len(checkpoint) == 1, "checkpoint_dir should contain only one checkpoint"
+    return os.path.join(checkpoint_dir, checkpoint[0])

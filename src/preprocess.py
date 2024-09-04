@@ -37,6 +37,7 @@ class DataModule:
         else:
             data = data[self.config.data.feature_to_tokenise + self.config.data.demographics]
 
+
         if len(self.config.data.demographics): # if there are demographics
             from sklearn.preprocessing import MinMaxScaler
             data_demog = data[self.config.data.demographics]
@@ -67,8 +68,9 @@ class DataModule:
         )
 
     def _process_input(self, data_file, send_label):
+        preserve_index = True
         data = self._read_and_process(path=data_file, send_label=send_label, annotation=['crowdsourced_empathy'])
-        data = Dataset.from_pandas(data, preserve_index=False) # convert to huggingface dataset
+        data = Dataset.from_pandas(data, preserve_index=preserve_index) # convert to huggingface dataset
         data = data.map(self._tokeniser_fn, batched=True, remove_columns=self.config.data.feature_to_tokenise) # tokenise
         data = data.rename_column('crowdsourced_empathy', 'labels')
         data.set_format('torch')
@@ -115,7 +117,11 @@ class SSLDataModule(DataModule):
         data_labelled["labels"] = data_labelled[["crowdsourced_empathy", "gpt_empathy"]].mean(axis=1)
         data_labelled.drop(columns=["crowdsourced_empathy", "gpt_empathy"], inplace=True)
 
-        data_unlabelled["labels"] = data_unlabelled[["crowdsourced_empathy"]]
+        # saving labelled data
+        good_samples = data_labelled.rename(columns={"labels": "crowdsourced_empathy"}) # rename to match the original column name
+        good_samples.to_csv(data_file.replace(".tsv", f"_labelled_{self.config.data.ssl_threshold}.tsv"), sep='\t', index=False)
+
+        data_unlabelled["labels"] = data_unlabelled[["crowdsourced_empathy"]] # why do we have labels in unlabelled data?
         data_unlabelled.drop(columns=["gpt_empathy"], inplace=True)
 
         data_labelled = Dataset.from_pandas(data_labelled, preserve_index=False)

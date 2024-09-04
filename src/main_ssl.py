@@ -13,7 +13,7 @@ import omegaconf
 from torch.utils.tensorboard import SummaryWriter
 
 from preprocess import SSLDataModule, DataModule
-from model import SSLRoberta
+from model import BayesianPLM
 from utils import seed_everything
 
 def main(
@@ -33,14 +33,12 @@ def main(
     # Seed RNGs
     seed_everything(config.seed)
 
-    time_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    logging_dir = os.path.join(config.train.logging_dir, datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + config.expt_name)
+    os.makedirs(logging_dir, exist_ok=True)
 
-    writer = SummaryWriter(log_dir=os.path.join(config.train.logging_dir, time_str))
+    writer = SummaryWriter(log_dir=logging_dir)
     # add config to tensorboard
     writer.add_text("config", omegaconf.OmegaConf.to_yaml(config))
-
-    output = os.path.join(config.train.output_dir, time_str)
-    os.makedirs(output, exist_ok=True)
 
     dm_ssl = SSLDataModule(config)
     train_dl_labelled, train_dl_unlabelled, y_mean, y_std = dm_ssl.get_dataloader(
@@ -56,8 +54,11 @@ def main(
         shuffle=False
     )
 
-    model = SSLRoberta(config)
-    model_1 = SSLRoberta(config)
+    model = BayesianPLM(config)
+    model_1 = BayesianPLM(config)
+
+    # model = torch.nn.DataParallel(model)
+    # model_1 = torch.nn.DataParallel(model_1)
 
     model = model.to(device)
     model_1 = model_1.to(device)
@@ -70,12 +71,12 @@ def main(
                                weight_decay=config.train.weight_decay)
     scheduler_1 = torch.optim.lr_scheduler.StepLR(optim_1, config.train.lr_step_period)
 
-    with open(os.path.join(output, "log.csv"), "a") as f:
+    with open(os.path.join(logging_dir, "log.csv"), "a") as f:
 
         epoch_resume = 0
         bestLoss = float("inf")
         try:
-            checkpoint = torch.load(os.path.join(output, "checkpoint.pt"))
+            checkpoint = torch.load(os.path.join(logging_dir, "checkpoint.pt"))
             model.load_state_dict(checkpoint['state_dict'], strict = False)
             optim.load_state_dict(checkpoint['opt_dict'])
             scheduler.load_state_dict(checkpoint['scheduler_dict'])
@@ -98,62 +99,57 @@ def main(
 
         for epoch in range(epoch_resume, config.train.num_epochs):
             print("Epoch #{}".format(epoch), flush=True)
-            for phase in ['train', 'val']:
 
-                start_time = time.time()
+            start_time = time.time()
 
-                # if device.type == "cuda":
-                #     for i in range(torch.cuda.device_count()):
-                #         torch.cuda.reset_peak_memory_stats(i)
-                
-                if phase == "train":
-                    loss_tr, loss_reg_0, loss_reg_1, cps, cps_l, cps_s,\
-                    yhat_0, yhat_1, y, mean_0_ls, mean_1_ls, var_0_ls, var_1_ls \
-                        = run_epoch(
-                            model, 
-                            model_1, 
-                            train_dl_labelled, 
-                            train_dl_unlabelled, 
-                            phase == "train", # means train = True
-                            optim, 
-                            optim_1,
-                            device=device,
-                            w_ulb=w_ulb, 
-                            y_mean=y_mean, 
-                            y_std=y_std,
-                            samp_ssl=samp_ssl
-                        )
+            # if device.type == "cuda":
+            #     for i in range(torch.cuda.device_count()):
+            #         torch.cuda.reset_peak_memory_stats(i)
 
-                    pcc_0 = pearsonr(y, yhat_0)[0] # [0] is the correlation coefficient statistic, [1] is the p-value
-                    pcc_1 = pearsonr(y, yhat_1)[0]
+            loss_tr, loss_reg_0, loss_reg_1, cps, cps_l, cps_s,\
+            yhat_0, yhat_1, y, mean_0_ls, mean_1_ls, var_0_ls, var_1_ls \
+                = run_epoch(
+                    model, 
+                    model_1, 
+                    train_dl_labelled, 
+                    train_dl_unlabelled, 
+                    train=True,
+                    optim=optim, 
+                    optim_1=optim_1,
+                    device=device,
+                    w_ulb=w_ulb, 
+                    y_mean=y_mean, 
+                    y_std=y_std,
+                    samp_ssl=samp_ssl
+                )
 
-                    writer.add_scalar("Loss/train", loss_tr, epoch)     
+            pcc_0, _ = pearsonr(y, yhat_0) # 1st return is the correlation coefficient statistic, 2nd is the p-value
+            pcc_1, _ = pearsonr(y, yhat_1)
 
-                    f.write("{},{},{},{},{},{},{},{}\n".format(epoch, phase, loss_tr, pcc_0, pcc_1, time.time() - start_time, loss_reg_0, cps))
-                    f.flush()
-                
-                else:
-                    loss_val, yhat, y, var_hat, var_e, var_a, mean_0_ls, var_0_ls = run_epoch_val(
-                        model = model, 
-                        model_1 = model_1, 
-                        dataloader = val_dl, 
-                        train = False, 
-                        optim = None,
-                        device=device,
-                        y_mean = y_mean, 
-                        y_std = y_std, 
-                        samp_ssl = samp_ssl
-                    )
+            writer.add_scalar("Loss/train", loss_tr, epoch)     
 
-                    pcc = pearsonr(y, yhat)[0]
+            f.write("Train,{},{},{},{},{},{},{}\n".format(epoch, loss_tr, pcc_0, pcc_1, time.time() - start_time, loss_reg_0, cps))
+            f.flush()
+            
+            loss_val, yhat, y, _, _, _, _, _ = run_epoch_val(
+                model = model, 
+                model_1 = model_1, 
+                dataloader = val_dl,
+                device=device,
+                y_mean = y_mean, 
+                y_std = y_std, 
+                samp_ssl = samp_ssl
+            )
 
-                    writer.add_scalar("Loss/val", loss_val, epoch)
-                    writer.add_scalar("PCC/val", pcc, epoch)
+            pcc, _ = pearsonr(y, yhat)
 
-                    f.write("{},{},{}".format(epoch, loss_val, time.time() - start_time))                    
+            writer.add_scalar("Loss/val", loss_val, epoch)
+            writer.add_scalar("PCC/val", pcc, epoch)
 
-                    f.write("\n")
-                    f.flush()
+            f.write("Val,{},{},{}".format(epoch, loss_val, time.time() - start_time))                    
+
+            f.write("\n")
+            f.flush()
             
             scheduler.step()
             scheduler_1.step()
@@ -173,16 +169,16 @@ def main(
                 'np_rndstate': np.random.get_state(),
                 'trch_rndstate': torch.get_rng_state()
             }
-            torch.save(save, os.path.join(output, "checkpoint.pt"))
+            torch.save(save, os.path.join(logging_dir, "checkpoint.pt"))
             
             if loss_val < bestLoss:
                 print("saved best because {} < {}".format(loss_val, bestLoss))
-                torch.save(save, os.path.join(output, "best.pt"))
+                torch.save(save, os.path.join(logging_dir, "best.pt"))
                 bestLoss = loss_val
 
         # Load best weights
         if config.train.num_epochs != 0:
-            checkpoint = torch.load(os.path.join(output, "best.pt"))
+            checkpoint = torch.load(os.path.join(logging_dir, "best.pt"))
             model.load_state_dict(checkpoint['state_dict'], strict = False)
             model_1.load_state_dict(checkpoint['state_dict_1'], strict = False)
 
@@ -252,7 +248,7 @@ def run_epoch(model,
         var1s_1 = []
 
         with torch.no_grad():
-            for _ in range(samp_ssl):
+            for _ in range(samp_ssl): # probably variational ensembling
                 mean1_raw_0, var1_raw_0 = model(
                     input_ids,
                     attention_mask
@@ -260,7 +256,7 @@ def run_epoch(model,
                 mean1_0 = mean1_raw_0.view(-1)
                 var1_0 = var1_raw_0.view(-1)
 
-                mean1s_0.append(mean1_0** 2)
+                mean1s_0.append(mean1_0 ** 2)
                 mean2s_0.append(mean1_0)
                 var1s_0.append(var1_0)
 
@@ -271,7 +267,7 @@ def run_epoch(model,
                 mean1_1 = mean1_raw_1.view(-1)
                 var1_1 = var1_raw_1.view(-1)
 
-                mean1s_1.append(mean1_1** 2)
+                mean1s_1.append(mean1_1 ** 2)
                 mean2s_1.append(mean1_1)
                 var1s_1.append(var1_1)
 
@@ -281,7 +277,7 @@ def run_epoch(model,
         var1s_0_stack = torch.stack(var1s_0, dim=1).to("cpu").detach().numpy()
         var1s_0_stack_ls.append(var1s_0_stack)
 
-        mean1s_0_ = torch.stack(mean1s_0, dim=0).mean(dim=0)
+        # mean1s_0_ = torch.stack(mean1s_0, dim=0).mean(dim=0)
         mean2s_0_ = torch.stack(mean2s_0, dim=0).mean(dim=0)
         var1s_0_ = torch.stack(var1s_0, dim=0).mean(dim=0)
 
@@ -290,16 +286,15 @@ def run_epoch(model,
         var1s_1_stack = torch.stack(var1s_1, dim=1).to("cpu").detach().numpy()
         var1s_1_stack_ls.append(var1s_1_stack)
 
-        mean1s_1_ = torch.stack(mean1s_1, dim=0).mean(dim=0)
+        # mean1s_1_ = torch.stack(mean1s_1, dim=0).mean(dim=0)
         mean2s_1_ = torch.stack(mean2s_1, dim=0).mean(dim=0)
         var1s_1_ = torch.stack(var1s_1, dim=0).mean(dim=0)
-
 
         all_output_unlb_0_pslb = mean2s_0_
         all_output_unlb_1_pslb = mean2s_1_
 
-        avg_mean01 = (all_output_unlb_0_pslb + all_output_unlb_1_pslb)/2
-        avg_var01 = (var1s_0_ + var1s_1_)/2
+        avg_mean01 = (all_output_unlb_0_pslb + all_output_unlb_1_pslb)/2 # eq 7, probably
+        avg_var01 = (var1s_0_ + var1s_1_)/2 # eq 8
 
         loss_mse_cps_0 = ((all_output_unlb_0_pred_0.view(-1) - avg_mean01)**2)
         loss_mse_cps_1 = ((all_output_unlb_1_pred_0.view(-1) - avg_mean01)**2)
@@ -408,9 +403,7 @@ def run_epoch(model,
 def run_epoch_val(
         model, 
         model_1, 
-        dataloader, 
-        train, 
-        optim,
+        dataloader,
         device,
         y_mean, 
         y_std, 
@@ -463,7 +456,7 @@ def run_epoch_val(
                     mean1 = mean1_raw.view(-1)
                     var1 = var1_raw.view(-1)
 
-                    mean1s.append(mean1** 2)
+                    mean1s.append(mean1 ** 2)
                     mean2s.append(mean1)
                     var1s.append(torch.exp(var1))
 
@@ -473,7 +466,7 @@ def run_epoch_val(
                     mean1_m1 = mean1_raw_m1.view(-1)
                     var1_m1 = var1_raw_m1.view(-1)
 
-                    mean1s_m1.append(mean1_m1** 2)
+                    mean1s_m1.append(mean1_m1 ** 2)
                     mean2s_m1.append(mean1_m1)
                     var1s_m1.append(torch.exp(var1_m1))
 
@@ -516,11 +509,6 @@ def run_epoch_val(
                 var_a.append(((var1s_ + var1s_m1_) / 2).to("cpu").detach().numpy())
 
                 loss = torch.nn.functional.mse_loss( (mean2s_ + mean2s_m1_) / 2 , (outcome - y_mean) / y_std )
-
-                if train:
-                    optim.zero_grad()
-                    loss.backward()
-                    optim.step()
 
                 total += loss.item() * input_ids.size(0)
                 n += input_ids.size(0)

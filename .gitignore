@@ -4,6 +4,13 @@ logs/
 output/
 tmp/
 
+# UCVME
+word_cloud_ucvme/
+requirements_UCVME.txt
+
+src/word_cloud/
+src/archived/
+
 req_resources.sh
 .make_env_ready.sh
 

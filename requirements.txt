@@ -1,5 +1,5 @@
 # python 3.12.3
-transformers
+transformers >= 4.43.0
 datasets
 sentencepiece
 peft
@@ -11,4 +11,10 @@ matplotlib
 scienceplots
 omegaconf
 
-scikit-learn
+## wordcloud
+# scikit-learn
+# wordcloud
+
+## agentic workflow
+# crewai
+# langchain-huggingface

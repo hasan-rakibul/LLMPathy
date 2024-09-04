@@ -54,10 +54,11 @@ def get_model(config):
             ]
         )
   
-    model = get_peft_model(model, peft_config)
+    if config.use_lora:
+        model = get_peft_model(model, peft_config)
     return model
 
-class SSLRoberta(nn.Module):
+class BayesianPLM(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = config
@@ -75,10 +76,33 @@ class SSLRoberta(nn.Module):
             attention_mask=attention_mask
         )
 
-        x_feat_m = nn.functional.dropout(outputs.logits, p=self.config.train.dropout, training=True)
-        x_feat_v = nn.functional.dropout(outputs.logits, p=self.config.train.dropout, training=True)
+        x = nn.functional.relu(outputs.logits)
+
+        x_feat_m = nn.functional.dropout(x, p=self.config.train.dropout, training=True)
+        x_feat_v = nn.functional.dropout(x, p=self.config.train.dropout, training=True)
 
         m = self.fc_m(x_feat_m)
         v = self.fc_v(x_feat_v)
 
+        m = 6 * nn.functional.sigmoid(m) + 1 # to ensure mean is in [1, 7]
+        v = nn.functional.softplus(v) # to ensure variance is positive
+
         return m, v
+    
+
+class BaselinePLM(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+        self.transformer = AutoModelForSequenceClassification.from_pretrained(
+            config.checkpoint,
+            num_labels=1
+        )
+
+    def forward(self, input_ids, attention_mask):
+        outputs = self.transformer(
+            input_ids=input_ids,
+            attention_mask=attention_mask
+        )
+
+        return outputs.logits
