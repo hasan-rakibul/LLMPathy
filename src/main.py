@@ -2,7 +2,6 @@ import os
 import argparse
 import datetime
 from omegaconf import OmegaConf
-from trainer import vanialla_plm, k_fold_cross_validation, find_noisy_samples_mcd, find_noisy_samples_agentic
 from utils import seed_everything
 from preprocess import DataModule
 
@@ -11,8 +10,6 @@ def main():
     parser.add_argument('--config', type=str, default='config/config.yaml')
     args = parser.parse_args()
     config = OmegaConf.load(args.config)
-
-    os.environ["CUDA_VISIBLE_DEVICES"] = config.cuda_visible_devices
 
     seed_everything(42)
 
@@ -29,20 +26,17 @@ def main():
 
     config.train.logging_dir = logging_dir # update customised logging_dir
 
-    datamodule = DataModule(config)
-    train_dataset = datamodule.get_huggingface_data(
-        data_file=config.data.train_file, 
-        send_label=True
-    )
-    val_dataset = datamodule.get_huggingface_data(
-        data_file=config.data.val_file,
-        send_label=True
-    )
+    from trainer import vanilla_plm
+    vanilla_plm(config)
 
-    # vanialla_plm(config, train_dataset, val_dataset, datamodule)
-    # k_fold_cross_validation(config, train_dataset, datamodule)
-    # find_noisy_samples_mcd(config, train_dataset, datamodule)
-    find_noisy_samples_agentic(config, train_dataset, datamodule)
+    # from trainer import k_fold_cross_validation
+    # k_fold_cross_validation(config)
+
+    # from trainer import find_noisy_samples_mcd
+    # find_noisy_samples_mcd(config)
+
+    # from trainer import noise_removed_plm
+    # noise_removed_plm(config)
 
 if __name__ == "__main__":
     main()

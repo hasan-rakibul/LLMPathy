@@ -69,7 +69,7 @@ class DataModule:
 
     def _process_input(self, data_file, send_label):
         preserve_index = True
-        data = self._read_and_process(path=data_file, send_label=send_label, annotation=['crowdsourced_empathy'])
+        data = self._read_and_process(path=data_file, send_label=send_label, annotation=['crowdsourced_empathy', 'gpt_empathy'])
         data = Dataset.from_pandas(data, preserve_index=preserve_index) # convert to huggingface dataset
         data = data.map(self._tokeniser_fn, batched=True, remove_columns=self.config.data.feature_to_tokenise) # tokenise
         data = data.rename_column('crowdsourced_empathy', 'labels')
