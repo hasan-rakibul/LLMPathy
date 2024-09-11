@@ -1,6 +1,6 @@
-expt_name: Baseline
+# expt_name: Baseline_v3
 # expt_name: RoBERTa-SSL-Old2New
-# expt_name: DetectNoiseLabels_Agentic
+expt_name: DetectNoiseLabels_Agentic_v3
 # expt_name: Debug
 seed: 42
 num_workers: 12
@@ -13,7 +13,8 @@ use_lora: False
 data:
   train_file: ./data/v2_v3_train.tsv
   # train_file: ./data/v2_v3_train_augmented_labelled_0.5.tsv
-  val_file: ./data/v2_dev.tsv
+  # val_file: ./data/v2_dev.tsv
+  val_file: ./data/v3_dev.tsv
   feature_to_tokenise: ['demographic_essay']
   max_length: 512
   demographics: []

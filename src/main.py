@@ -26,8 +26,8 @@ def main():
 
     config.train.logging_dir = logging_dir # update customised logging_dir
 
-    from trainer import vanilla_plm
-    vanilla_plm(config)
+    # from trainer import vanilla_plm
+    # vanilla_plm(config)
 
     # from trainer import k_fold_cross_validation
     # k_fold_cross_validation(config)
@@ -35,8 +35,8 @@ def main():
     # from trainer import find_noisy_samples_mcd
     # find_noisy_samples_mcd(config)
 
-    # from trainer import noise_removed_plm
-    # noise_removed_plm(config)
+    from trainer import noise_removed_plm
+    noise_removed_plm(config)
 
 if __name__ == "__main__":
     main()

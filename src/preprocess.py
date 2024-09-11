@@ -16,7 +16,7 @@ class DataModule:
         self.tokeniser = AutoTokenizer.from_pretrained(
                 self.config.checkpoint,
                 use_fast=True,
-                add_prefix_space=True # the first word is tokenised differently if not a prefix space
+                add_prefix_space=False # the first word is tokenised differently if not a prefix space, but it might decrease performance, so False (09/24)
         )
 
         if 'mistral' in self.config.checkpoint or 'llama' in self.config.checkpoint:
