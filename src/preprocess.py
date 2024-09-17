@@ -193,3 +193,105 @@ class SSLDataModule(DataModule):
         )
 
         return dataloader_labelled, dataloader_unlabelled, y_mean, y_std
+
+class DataModuleFromRaw:
+    def __init__(self, config):
+
+        self.config = config
+        
+        self.tokeniser = AutoTokenizer.from_pretrained(
+                self.config.checkpoint,
+                use_fast=True,
+                add_prefix_space=False # the first word is tokenised differently if not a prefix space, but it might decrease performance, so False (09/24)
+        )
+
+        if 'mistral' in self.config.checkpoint or 'llama' in self.config.checkpoint:
+            # the tokeniser for mistral and llama does not have the a default pad token
+            # so we use eos token as the pad token
+            self.tokeniser.pad_token_id = self.tokeniser.eos_token_id
+            self.tokeniser.pad_token = self.tokeniser.eos_token
+            
+        self.data_collator = DataCollatorWithPadding(tokenizer=self.tokeniser)
+    
+    def _raw_to_processed(self, path, send_label):
+        print(f"\nReading data from {path}")
+        data = pd.read_csv(path, sep='\t', na_values="unknown") # some column includes "unknown"
+        print(f"Read {len(data)} samples from {path}")
+
+        # keep revent columns only
+        columns_to_keep = self.config.data.feature_to_tokenise + \
+            self.config.data.demographics + \
+            self.config.data.extra_columns_to_keep
+
+        if send_label:
+            columns_to_keep.append(self.config.data.label_column)
+        
+        data = data[columns_to_keep]
+
+        print("Columns with NaN values:", data.columns[data.isna().any()].tolist())
+        data = data.dropna() # drop NaN values
+        print(f"Removed NaN values if existed. {len(data)} samples remaining.\n")
+
+        assert data.isna().any().any() == False, "There are still NaN values in the data."
+        assert data.isnull().any().any() == False, "The are still null values in the data"
+        
+        return data.copy() # return a copy to avoid modifying the original data
+
+    def _tokeniser_fn(self, sentence):
+        if len(self.config.data.feature_to_tokenise) == 1: # only one feature
+            return self.tokeniser(
+                sentence[self.config.data.feature_to_tokenise[0]],
+                truncation=True,
+                max_length=self.config.data.max_length
+            )
+        # otherwise tokenise a pair of sentence
+        return self.tokeniser(
+            sentence[self.config.data.feature_to_tokenise[0]],
+            sentence[self.config.data.feature_to_tokenise[1]],
+            truncation=True,
+            max_length=self.config.data.max_length
+        )
+
+    def get_hf_data(self, data_path_list, send_label):
+        # we may combine the data from different versions
+        for data_path in data_path_list:
+            data = self._raw_to_processed(data_path, send_label)
+            if 'all_data' in locals():
+                all_data = pd.concat([all_data, data])
+            else:
+                all_data = data
+
+        print(f"Total number of samples: {len(all_data)}\n")
+        
+        # add sample_id column
+        all_data['sample_id'] = range(len(all_data))        
+        all_data_hf = Dataset.from_pandas(all_data, preserve_index=False) # convert to huggingface dataset
+        
+        all_data_hf = all_data_hf.map(self._tokeniser_fn, batched=True, remove_columns=self.config.data.feature_to_tokenise) # tokenise
+        all_data_hf = all_data_hf.rename_column(self.config.data.label_column, 'labels')
+        all_data_hf.set_format('torch')
+        return all_data_hf
+    
+    # taken from https://pytorch.org/docs/stable/notes/randomness.html
+    def _seed_worker(self, worker_id):
+        worker_seed = torch.initial_seed() % 2**32
+        np.random.seed(worker_seed)
+        random.seed(worker_seed) 
+    
+    def get_dataloader(self, data_path_list, send_label, shuffle):
+        # making sure the shuffling is reproducible
+        g = torch.Generator()
+        g.manual_seed(self.config.seed)
+
+        hf_data = self.get_hf_data(data_path_list=data_path_list, send_label=send_label)
+        return DataLoader(
+            hf_data,
+            batch_size=self.config.train.batch_size, 
+            shuffle=shuffle,
+            collate_fn=self.data_collator,
+            num_workers=self.config.num_workers,
+            pin_memory=torch.cuda.is_available(),
+            worker_init_fn=self._seed_worker,
+            generator=g
+        )
+    
