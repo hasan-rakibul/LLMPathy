@@ -306,6 +306,7 @@ def noise_removed_plm(config):
     if config.data.mc_index_file and config.data.lc_index_file:
         mc_index = list(np.load(config.data.mc_index_file))
         lc_index = list(np.load(config.data.lc_index_file))
+        config.train.logging_dir = os.path.dirname(config.data.mc_index_file)
     else:
         _, mc_index, lc_index = _find_noisy_samples_agentic(config, train_dataset, datamodule)
         config.train.checkpoint_dir = False # reset checkpoint_dir as it (if any) is for agents

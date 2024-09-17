@@ -36,7 +36,6 @@ def _get_embeddings(config):
 def _compute_similarity(config):
     embeddings, labels = _get_embeddings(config)
     bin_edges = np.arange(0, 7.5, 0.5)
-    # binned_labels = pd.cut(labels.numpy(), bins=bin_edges, labels=False, include_lowest=True)
 
     binned_labels = np.digitize(labels.numpy(), bin_edges) - 1 # map to 0-indexed bins
 
@@ -67,10 +66,10 @@ def _compute_similarity(config):
 
 def plot_similarity(config):
     similarities = _compute_similarity(config)
-    plt.hist(similarities, bins=1000)
+    plt.hist(similarities, bins=100)
     plt.xlabel('Cosine Similarity')
     plt.ylabel('# of Essay Pairs')
-    plt.savefig(os.path.join(config.train.logging_dir, 'Gaussian.pdf'), format='pdf', bbox_inches='tight')
+    plt.savefig(os.path.join(config.train.logging_dir, 'Gaussian_v2_100bin.pdf'), format='pdf', bbox_inches='tight')
     plt.show()
     
 

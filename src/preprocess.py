@@ -69,10 +69,11 @@ class DataModule:
 
     def _process_input(self, data_file, send_label):
         preserve_index = True
-        data = self._read_and_process(path=data_file, send_label=send_label, annotation=['crowdsourced_empathy', 'gpt_empathy'])
+        annotation = self.config.data.train_label_list
+        data = self._read_and_process(path=data_file, send_label=send_label, annotation=annotation)
         data = Dataset.from_pandas(data, preserve_index=preserve_index) # convert to huggingface dataset
         data = data.map(self._tokeniser_fn, batched=True, remove_columns=self.config.data.feature_to_tokenise) # tokenise
-        data = data.rename_column('crowdsourced_empathy', 'labels')
+        data = data.rename_column(annotation[0], 'labels')
         data.set_format('torch')
         return data 
 
@@ -93,7 +94,7 @@ class DataModule:
 
         data = self.get_huggingface_data(data_file=data_file, send_label=send_label)
         return DataLoader(
-            data, 
+            data,
             batch_size=self.config.train.batch_size, 
             shuffle=shuffle,
             collate_fn=self.data_collator,
@@ -102,6 +103,27 @@ class DataModule:
             worker_init_fn=self._seed_worker,
             generator=g
         )
+    
+    def get_dataloaders_WASSA(self):
+        train_dataset = self.get_huggingface_data(data_file=self.config.data.train_file, send_label=True)
+        train_dataloader = DataLoader(
+            train_dataset,
+            batch_size=self.config.train.batch_size,
+            sampler=torch.utils.data.sampler.RandomSampler(train_dataset),
+            collate_fn=self.data_collator,
+            num_workers=self.config.num_workers
+        )
+
+        val_dataset = self.get_huggingface_data(data_file=self.config.data.val_file, send_label=True)
+        val_dataloader = DataLoader(
+            val_dataset,
+            batch_size=self.config.train.batch_size,
+            sampler=torch.utils.data.sampler.SequentialSampler(val_dataset),
+            collate_fn=self.data_collator,
+            num_workers=self.config.num_workers
+        )
+
+        return train_dataloader, val_dataloader
 
 
 class SSLDataModule(DataModule):
