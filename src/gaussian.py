@@ -6,11 +6,11 @@ from omegaconf import OmegaConf
 import matplotlib.pyplot as plt
 from torch.nn.functional import cosine_similarity
 
-from preprocess import DataModule
+from preprocess import DataModuleFromRaw
 
 def _get_embeddings(config):
-    data_module = DataModule(config)
-    dataloader = data_module.get_dataloader(data_file=config.data.train_file, send_label=True, shuffle=False)
+    data_module = DataModuleFromRaw(config)
+    dataloader = data_module.get_dataloader(data_path_list=config.train_file_list, send_label=True, shuffle=False)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -69,7 +69,7 @@ def plot_similarity(config):
     plt.hist(similarities, bins=100)
     plt.xlabel('Cosine Similarity')
     plt.ylabel('# of Essay Pairs')
-    plt.savefig(os.path.join(config.train.logging_dir, 'Gaussian_v2_100bin.pdf'), format='pdf', bbox_inches='tight')
+    plt.savefig(os.path.join(config.logging_dir, 'Gaussian_v2_100bin_all.pdf'), format='pdf', bbox_inches='tight')
     plt.show()
     
 

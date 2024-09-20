@@ -2,41 +2,40 @@ import os
 import argparse
 import datetime
 from omegaconf import OmegaConf
-from utils import seed_everything
-from preprocess import DataModule
+import lightning as L
+import logging
+from trainer import vanilla_plm
+
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
 
 def main():
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
+    os.environ['TRANSFORMERS_NO_ADVISORY_WARNINGS'] = "true"
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str, default='config/config.yaml')
     args = parser.parse_args()
     config = OmegaConf.load(args.config)
 
-    seed_everything(42)
+    L.seed_everything(42)
 
-    if config.train.checkpoint_dir:
-        assert os.path.exists(config.train.checkpoint_dir), "checkpoint_dir does not exist"
-        logging_dir = config.train.checkpoint_dir   
+    if config.resume_from_checkpoint:
+        assert os.path.exists(config.resume_from_checkpoint), "checkpoint_dir does not exist"
+        logging_dir = config.resume_from_checkpoint   
     else:
         logging_dir=os.path.join(
-            config.train.logging_dir, 
+            config.logging_dir, 
             datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + config.expt_name
         )
-        os.makedirs(logging_dir, exist_ok=True)
-        OmegaConf.save(config, os.path.join(logging_dir, "config.yaml"))
 
-    config.train.logging_dir = logging_dir # update customised logging_dir
+    config.logging_dir = logging_dir # update customised logging_dir
 
-    # from trainer import vanilla_plm
-    # vanilla_plm(config)
+    vanilla_plm(config)
 
-    # from trainer import k_fold_cross_validation
-    # k_fold_cross_validation(config)
-
-    # from trainer import find_noisy_samples_mcd
-    # find_noisy_samples_mcd(config)
-
-    from trainer import noise_removed_plm
-    noise_removed_plm(config)
 
 if __name__ == "__main__":
     main()

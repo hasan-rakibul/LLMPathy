@@ -1,108 +1,146 @@
 from transformers import AutoModelForSequenceClassification
-from peft import get_peft_model, LoraConfig, TaskType
-from torch import nn
+import torch
+import lightning as L
+from lightning.pytorch.utilities import rank_zero_only
+from torchmetrics.regression import PearsonCorrCoef
+import os
+import logging
+import pandas as pd
+from utils import log_info
 
-def get_model(config):
-    if 'roberta' in config.checkpoint:
-        model = AutoModelForSequenceClassification.from_pretrained(
-            pretrained_model_name_or_path=config.checkpoint,
-            num_labels=1
-        )
-        peft_config = LoraConfig(
-            task_type=TaskType.SEQ_CLS,
-            r=2,
-            lora_alpha=16,
-            lora_dropout=0.1,
-            bias="none"
-        )
-    elif 'mistral' in config.checkpoint:
-        model = AutoModelForSequenceClassification.from_pretrained(
-            pretrained_model_name_or_path=config.checkpoint,
-            num_labels=1,
-            device_map="auto"
-        )
-        model.config.pad_token_id = model.config.eos_token_id
-        peft_config = LoraConfig(
-            task_type=TaskType.SEQ_CLS,
-            r=2,
-            lora_alpha=16,
-            lora_dropout=0.1,
-            bias="none",
-            target_modules=[
-                "q_proj",
-                "v_proj"
-            ]
-        )
-    elif 'llama' in config.checkpoint:
-        model = AutoModelForSequenceClassification.from_pretrained(
-            pretrained_model_name_or_path=config.checkpoint,
-            num_labels=1,
-            device_map="auto",
-            offload_folder="offload",
-            trust_remote_code=True
-        )
-        model.config.pad_token_id = model.config.eos_token_id
-        peft_config = LoraConfig(
-            task_type=TaskType.SEQ_CLS,
-            r=16,
-            lora_alpha=16,
-            lora_dropout=0.05,
-            bias="none",
-            target_modules=[
-                "q_proj",
-                "v_proj"
-            ]
-        )
-  
-    if config.use_lora:
-        model = get_peft_model(model, peft_config)
-    return model
+logger = logging.getLogger(__name__)
 
-class BayesianPLM(nn.Module):
+class LightningPLM(L.LightningModule):
     def __init__(self, config):
         super().__init__()
+        self.save_hyperparameters()
         self.config = config
-        self.transformer = AutoModelForSequenceClassification.from_pretrained(
-            config.checkpoint,
-            num_labels=768
+        self.model = AutoModelForSequenceClassification.from_pretrained(
+            pretrained_model_name_or_path=self.config.plm,
+            num_labels=1 # regression
         )
-
-        self.fc_m = nn.Linear(768, 1)
-        self.fc_v = nn.Linear(768, 1)
+        self.training_step_outputs = []
+        self.training_step_labels = []
+        self.validation_step_outputs = []
+        self.validation_step_labels = []
+        self.test_step_outputs = []
+        self.test_step_labels = []
+        self.pearsonr = PearsonCorrCoef()
 
     def forward(self, input_ids, attention_mask):
-        outputs = self.transformer(
+        outputs = self.model(
             input_ids=input_ids,
             attention_mask=attention_mask
         )
-
-        x = nn.functional.relu(outputs.logits)
-
-        x_feat_m = nn.functional.dropout(x, p=self.config.train.dropout, training=True)
-        x_feat_v = nn.functional.dropout(x, p=self.config.train.dropout, training=True)
-
-        m = self.fc_m(x_feat_m)
-        v = self.fc_v(x_feat_v)
-
-        m = 6 * nn.functional.sigmoid(m) + 1 # to ensure mean is in [1, 7]
-        v = nn.functional.softplus(v) # to ensure variance is positive
-
-        return m, v
+        return outputs.logits.squeeze(-1) # remove the last dimension
     
+    def configure_optimizers(self):
+        optimizer = torch.optim.AdamW(
+            self.model.parameters(),
+            lr=self.config.lr,
+            betas=(0.9, 0.98),
+            eps=1e-06,
+            weight_decay=0.1
+        )
+        lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            mode='min',
+            patience=3,
+            threshold=0.001
+        )
+        return {
+            'optimizer': optimizer,
+            'lr_scheduler': {
+                'scheduler': lr_scheduler,
+                'monitor': 'val_loss',
+                'frequency': 1
+            }
+        }
+    
+    def _outputs_from_batch(self, batch):
+        outputs = self(
+            input_ids=batch['input_ids'],
+            attention_mask=batch['attention_mask']
+        )
+        return outputs
+    
+    def _save_predictions(self, preds, labels=None):
+        preds_np = preds.cpu().numpy()
+        
+        pred_df = pd.DataFrame({'emp': preds_np, 'dis': preds_np}) # we're not predicting distress, just aligning with submission system
+        pred_df.to_csv(
+            os.path.join(self.config.logging_dir, "predictions_EMP.tsv"),
+            sep='\t', index=None, header=None
+        )
+        log_info(logger, f'Saved predictions to {self.config.logging_dir}/predictions_EMP.tsv')
+        
+        if labels is not None:
+            pearsonr = self.pearsonr(preds, labels)
+            log_info(logger, f'Validation pearsonr: {pearsonr.cpu().numpy()}')
 
-class BaselinePLM(nn.Module):
-    def __init__(self, config):
-        super().__init__()
-        self.config = config
-        self.transformer = AutoModelForSequenceClassification.from_pretrained(
-            config.checkpoint,
-            num_labels=1
+            with open(os.path.join(self.config.logging_dir, "pearsonr.txt"), 'w') as f:
+                f.write(str(pearsonr))   
+
+    def training_step(self, batch, batch_idx):
+        outputs = self._outputs_from_batch(batch)
+        loss = torch.nn.functional.mse_loss(outputs, batch['labels'])
+        self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+        
+        self.training_step_outputs.append(outputs)
+        self.training_step_labels.append(batch['labels'])
+
+        return loss
+    
+    def on_train_epoch_end(self):
+        all_preds = torch.cat(self.training_step_outputs)
+        all_labels = torch.cat(self.training_step_labels)
+        self.log(
+            'train_pearsonr', 
+            self.pearsonr(all_preds, all_labels),
+            prog_bar=True,
+            sync_dist=True
+        )
+        self.training_step_outputs.clear() # free up memory
+        self.training_step_labels.clear()
+    
+    def validation_step(self, batch, batch_idx):
+        outputs = self._outputs_from_batch(batch)
+        loss = torch.nn.functional.mse_loss(outputs, batch['labels'])
+        self.log('val_loss', loss, sync_dist=True)
+
+        self.validation_step_outputs.append(outputs)
+        self.validation_step_labels.append(batch['labels'])
+    
+    def on_validation_epoch_end(self):
+        all_preds = torch.cat(self.validation_step_outputs)
+        all_labels = torch.cat(self.validation_step_labels)
+        self.log(
+            'val_pearsonr',
+            self.pearsonr(all_preds, all_labels),
+            prog_bar=True,
+            sync_dist=True
         )
 
-    def forward(self, input_ids, attention_mask):
-        outputs = self.transformer(
-            input_ids=input_ids,
-            attention_mask=attention_mask
-        )
+        self.validation_step_outputs.clear()
+        self.validation_step_labels.clear()
 
-        return outputs.logits
+    @rank_zero_only
+    def test_step(self, batch, batch_idx):
+        outputs = self._outputs_from_batch(batch)
+        self.test_step_outputs.append(outputs)
+        if 'labels' in batch:
+            self.test_step_labels.append(batch['labels'])
+    
+    @rank_zero_only
+    def on_test_epoch_end(self):
+        all_preds = torch.cat(self.test_step_outputs)
+        if len(self.test_step_labels) > 0:
+            all_labels = torch.cat(self.test_step_labels)
+        else:
+            all_labels = None
+
+        self._save_predictions(all_preds, all_labels)
+
+        self.test_step_outputs.clear()
+        self.test_step_labels.clear()
+        
