@@ -4,7 +4,8 @@ import datetime
 from omegaconf import OmegaConf
 import lightning as L
 import logging
-from trainer import vanilla_plm
+from trainer import vanilla_plm, noise_removed_plm
+import transformers
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -15,7 +16,8 @@ logger = logging.getLogger(__name__)
 
 def main():
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
-    os.environ['TRANSFORMERS_NO_ADVISORY_WARNINGS'] = "true"
+    transformers.logging.set_verbosity_error()
+    
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=str, default='config/config.yaml')
     args = parser.parse_args()
@@ -23,9 +25,9 @@ def main():
 
     L.seed_everything(42)
 
-    if config.resume_from_checkpoint:
-        assert os.path.exists(config.resume_from_checkpoint), "checkpoint_dir does not exist"
-        logging_dir = config.resume_from_checkpoint   
+    if config.load_from_checkpoint:
+        assert os.path.exists(config.load_from_checkpoint), "checkpoint_dir does not exist"
+        logging_dir = config.load_from_checkpoint   
     else:
         logging_dir=os.path.join(
             config.logging_dir, 
@@ -34,7 +36,8 @@ def main():
 
     config.logging_dir = logging_dir # update customised logging_dir
 
-    vanilla_plm(config)
+    # vanilla_plm(config)
+    noise_removed_plm(config)
 
 
 if __name__ == "__main__":

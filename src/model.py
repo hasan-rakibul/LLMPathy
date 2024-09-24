@@ -2,7 +2,7 @@ from transformers import AutoModelForSequenceClassification
 import torch
 import lightning as L
 from lightning.pytorch.utilities import rank_zero_only
-from torchmetrics.regression import PearsonCorrCoef
+from torchmetrics.regression import PearsonCorrCoef, ConcordanceCorrCoef
 import os
 import logging
 import pandas as pd
@@ -26,6 +26,7 @@ class LightningPLM(L.LightningModule):
         self.test_step_outputs = []
         self.test_step_labels = []
         self.pearsonr = PearsonCorrCoef()
+        self.ccc = ConcordanceCorrCoef()
 
     def forward(self, input_ids, attention_mask):
         outputs = self.model(
@@ -76,10 +77,15 @@ class LightningPLM(L.LightningModule):
         
         if labels is not None:
             pearsonr = self.pearsonr(preds, labels)
-            log_info(logger, f'Validation pearsonr: {pearsonr.cpu().numpy()}')
+            ccc = self.ccc(preds, labels)
+            pearsonr = pearsonr.cpu().numpy()
+            ccc = ccc.cpu().numpy()
+            log_info(logger, f'Validation pearsonr: {pearsonr}')
+            log_info(logger, f'Validation CCC: {ccc}')
 
-            with open(os.path.join(self.config.logging_dir, "pearsonr.txt"), 'w') as f:
-                f.write(str(pearsonr))   
+            with open(os.path.join(self.config.logging_dir, "metrics.txt"), 'w') as f:
+                f.write(f"Pearsonr: {pearsonr}\n")
+                f.write(f"CCC: {ccc}\n")
 
     def training_step(self, batch, batch_idx):
         outputs = self._outputs_from_batch(batch)
@@ -97,6 +103,14 @@ class LightningPLM(L.LightningModule):
         self.log(
             'train_pearsonr', 
             self.pearsonr(all_preds, all_labels),
+            logger=True,
+            prog_bar=True,
+            sync_dist=True
+        )
+        self.log(
+            'train_ccc',
+            self.ccc(all_preds, all_labels),
+            logger=True,
             prog_bar=True,
             sync_dist=True
         )
@@ -106,7 +120,7 @@ class LightningPLM(L.LightningModule):
     def validation_step(self, batch, batch_idx):
         outputs = self._outputs_from_batch(batch)
         loss = torch.nn.functional.mse_loss(outputs, batch['labels'])
-        self.log('val_loss', loss, sync_dist=True)
+        self.log('val_loss', loss, on_step=True, on_epoch=True, logger=True, prog_bar=True, sync_dist=True)
 
         self.validation_step_outputs.append(outputs)
         self.validation_step_labels.append(batch['labels'])
@@ -117,6 +131,14 @@ class LightningPLM(L.LightningModule):
         self.log(
             'val_pearsonr',
             self.pearsonr(all_preds, all_labels),
+            logger=True,
+            prog_bar=True,
+            sync_dist=True
+        )
+        self.log(
+            'val_ccc',
+            self.ccc(all_preds, all_labels),
+            logger=True,
             prog_bar=True,
             sync_dist=True
         )

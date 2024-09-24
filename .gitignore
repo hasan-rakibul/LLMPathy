@@ -4,6 +4,8 @@ logs/
 output/
 tmp/
 
+scratch.ipynb
+
 # UCVME
 word_cloud_ucvme/
 requirements_UCVME.txt

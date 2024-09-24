@@ -1,9 +1,9 @@
-############ NOT used if any (resume)checkpoint is provided #######
+############ NOT used if any load_from_checkpoint is provided #######
 
-expt_name: Baseline
+# expt_name: Baseline
 # expt_name: DetectNoiseLabels_Agentic_Onlyv3
 # expt_name: DetectNoiseLabels_Agentic_Onlyv3
-# expt_name: Debug
+expt_name: Debug
 
 ############ Used for most of the experiments ############
 
@@ -14,40 +14,42 @@ num_epochs: 10
 lr: 1.0e-5
 batch_size: 16
 logging_dir: ./logs
-resume_from_checkpoint: False
+load_from_checkpoint: False # False or path to checkpoint file (.ckpt) of the vanilla model (not the agentic models)
 
+# test_mode: True # only for testing
+# load_from_checkpoint: logs/20240920_164626_Baseline/lightning_logs/version_15755097/checkpoints/epoch=6-step=147.ckpt
 
-train_file_list: ["data/NewsEmp2022/messages_train_ready_for_WS.tsv", "./data/NewsEmp2023/WASSA23_essay_level_with_labels_train.tsv"]
-# train_file_list: ["./data/NewsEmp2023/WASSA23_essay_level_with_labels_train.tsv"]
-# train_file_list: ./data/v2_v3_train_augmented_labelled_0.5.tsv
+train_file_list: ["data/NewsEmp2022/messages_train_ready_for_WS_with_LLM.tsv", "./data/NewsEmp2023/WASSA23_essay_level_with_labels_train_with_LLM.tsv"]
+
 label_column: empathy
+llm_column: llm_empathy
 
 val_file_list: ["data/NewsEmp2023/WASSA23_essay_level_dev.tsv"]
+
 ### for 2022 and 2023, we have separate gold standard files
 val_goldstandard_file: data/NewsEmp2023/goldstandard_dev.tsv
+
+test_file_list: ["data/NewsEmp2023/WASSA23_essay_level_test.tsv"]
 
 ############ v2 only ############
 
 
-
 ############ v3 only ############
-# train_file_list: ["./data/WASSA2023/WASSA23_essay_level_with_labels_train.tsv"]
-
-
-# feature_to_tokenise: ['demographic_essay']
+# train_file_list: ["./data/NewsEmp2023/WASSA23_essay_level_with_labels_train.tsv"]
 
 feature_to_tokenise: ["essay"]
-extra_columns_to_keep: ["article_id"]
+# extra_columns_to_keep: ["article_id"]
+extra_columns_to_keep: []
 max_length: 512
 demographics: []
 # demographics: ['gender', 'education', 'race', 'age', 'income']
 
 ############ For Agentic approach ############
-noise_level: 10
+noise_level: 20
 num_agents: 5
 mc_index_file: False
 lc_index_file: False
 
-# mc_index_file: ./logs/20240904_193336_DetectNoiseLabels_Agentic/mc_index_50.npy
-# lc_index_file: ./logs/20240904_193336_DetectNoiseLabels_Agentic/lc_index_50.npy
+# mc_index_file: ./logs/20240904_193336_DetectNoiseLabels_Agentic_v3_noise_level_50/mc_index_50.npy
+# lc_index_file: ./logs/20240904_193336_DetectNoiseLabels_Agentic_v3_noise_level_50/lc_index_50.npy
 

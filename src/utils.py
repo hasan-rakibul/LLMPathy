@@ -1,10 +1,11 @@
-import os
 import matplotlib.pyplot as plt
 import scienceplots
 
-import torch
-import numpy as np
-import random
+from lightning.pytorch.utilities import rank_zero_only
+
+@rank_zero_only
+def log_info(logger, msg):
+    logger.info(msg)
 
 def plot(x, y, y2=None, xlabel=None, ylabel=None, legend=[], save=False, filename=None):
     """Plot data points"""
@@ -24,14 +25,3 @@ def plot(x, y, y2=None, xlabel=None, ylabel=None, legend=[], save=False, filenam
         print(f"Saved as {filename}.pdf")
         
     fig.show()
-
-def seed_everything(seed):
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-
-def resolve_checkpoint(checkpoint_dir):
-    items = os.listdir(checkpoint_dir)
-    checkpoint = [item for item in items if item.startswith("checkpoint")]
-    assert len(checkpoint) == 1, "checkpoint_dir should contain only one checkpoint"
-    return os.path.join(checkpoint_dir, checkpoint[0])
