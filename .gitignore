@@ -4,6 +4,7 @@ logs/
 output/
 tmp/
 
+src/scratch.py
 scratch.ipynb
 
 # UCVME

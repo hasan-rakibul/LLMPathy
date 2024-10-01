@@ -1,6 +1,7 @@
 ############ NOT used if any load_from_checkpoint is provided #######
 
 # expt_name: Baseline
+# expt_name: DetectNoiseLabels_Agentic_v2_v3
 # expt_name: DetectNoiseLabels_Agentic_Onlyv3
 # expt_name: DetectNoiseLabels_Agentic_Onlyv3
 expt_name: Debug
@@ -10,16 +11,19 @@ expt_name: Debug
 seed: 0
 num_workers: 12
 plm: roberta-base
-num_epochs: 10
+num_epochs: 1
 lr: 1.0e-5
 batch_size: 16
 logging_dir: ./logs
+
+test_mode: False # training and validation only
 load_from_checkpoint: False # False or path to checkpoint file (.ckpt) of the vanilla model (not the agentic models)
 
 # test_mode: True # only for testing
+save_predictions_to_disk: True # True or False
 # load_from_checkpoint: logs/20240920_164626_Baseline/lightning_logs/version_15755097/checkpoints/epoch=6-step=147.ckpt
 
-train_file_list: ["data/NewsEmp2022/messages_train_ready_for_WS_with_LLM.tsv", "./data/NewsEmp2023/WASSA23_essay_level_with_labels_train_with_LLM.tsv"]
+# train_file_list: ["data/NewsEmp2022/messages_train_ready_for_WS_with_LLM.tsv", "./data/NewsEmp2023/WASSA23_essay_level_with_labels_train_with_LLM.tsv"]
 
 label_column: empathy
 llm_column: llm_empathy
@@ -35,21 +39,24 @@ test_file_list: ["data/NewsEmp2023/WASSA23_essay_level_test.tsv"]
 
 
 ############ v3 only ############
-# train_file_list: ["./data/NewsEmp2023/WASSA23_essay_level_with_labels_train.tsv"]
+train_file_list: ["./data/NewsEmp2023/WASSA23_essay_level_with_labels_train_with_LLM.tsv"]
 
 feature_to_tokenise: ["essay"]
+
+### extra column in train, val and test
 # extra_columns_to_keep: ["article_id"]
 extra_columns_to_keep: []
+
+### extra column in train only
+extra_columns_to_keep_train: ["llm_empathy"]
+
 max_length: 512
 demographics: []
 # demographics: ['gender', 'education', 'race', 'age', 'income']
 
 ############ For Agentic approach ############
-noise_level: 20
+noise_level: 0.5
 num_agents: 5
-mc_index_file: False
-lc_index_file: False
 
-# mc_index_file: ./logs/20240904_193336_DetectNoiseLabels_Agentic_v3_noise_level_50/mc_index_50.npy
-# lc_index_file: ./logs/20240904_193336_DetectNoiseLabels_Agentic_v3_noise_level_50/lc_index_50.npy
-
+# updated_train_dl_file: False
+updated_train_dl_file: logs/20240926_113249_DetectNoiseLabels_Agentic_v2_v3/updated_train_dl.pt

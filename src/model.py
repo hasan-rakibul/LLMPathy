@@ -65,6 +65,7 @@ class LightningPLM(L.LightningModule):
         )
         return outputs
     
+    @rank_zero_only
     def _save_predictions(self, preds, labels=None):
         preds_np = preds.cpu().numpy()
         
@@ -146,7 +147,7 @@ class LightningPLM(L.LightningModule):
         self.validation_step_outputs.clear()
         self.validation_step_labels.clear()
 
-    @rank_zero_only
+    # cannot be made to run on a single GPU
     def test_step(self, batch, batch_idx):
         outputs = self._outputs_from_batch(batch)
         self.test_step_outputs.append(outputs)
@@ -161,8 +162,20 @@ class LightningPLM(L.LightningModule):
         else:
             all_labels = None
 
-        self._save_predictions(all_preds, all_labels)
+        if self.config.save_predictions_to_disk:
+            self._save_predictions(all_preds, all_labels)
 
         self.test_step_outputs.clear()
         self.test_step_labels.clear()
-        
+    
+    # # cannot be made to run on a single GPU
+    # def predict_step(self, batch, batch_idx):
+    #     outputs = self._outputs_from_batch(batch)
+    #     self.predict_step_outputs.append(outputs)
+    #     return outputs
+    
+    # @rank_zero_only
+    # def on_predict_epoch_end(self):
+    #     all_preds = torch.cat(self.predict_step_outputs)
+    #     self.predict_step_outputs.clear()
+    

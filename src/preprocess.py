@@ -52,6 +52,8 @@ class DataModuleFromRaw:
 
         if have_label:
             columns_to_keep.append(self.config.label_column)
+            if not val: # means it is train
+                columns_to_keep.extend(self.config.extra_columns_to_keep_train) # this is a list
         
         data = data[columns_to_keep]
 

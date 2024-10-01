@@ -23,7 +23,7 @@ def main():
     args = parser.parse_args()
     config = OmegaConf.load(args.config)
 
-    L.seed_everything(42)
+    L.seed_everything(config.seed)
 
     if config.load_from_checkpoint:
         assert os.path.exists(config.load_from_checkpoint), "checkpoint_dir does not exist"
@@ -36,8 +36,8 @@ def main():
 
     config.logging_dir = logging_dir # update customised logging_dir
 
-    # vanilla_plm(config)
-    noise_removed_plm(config)
+    vanilla_plm(config)
+    # noise_removed_plm(config)
 
 
 if __name__ == "__main__":

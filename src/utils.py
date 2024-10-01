@@ -7,6 +7,10 @@ from lightning.pytorch.utilities import rank_zero_only
 def log_info(logger, msg):
     logger.info(msg)
 
+@rank_zero_only
+def log_debug(logger, msg):
+    logger.debug(msg)
+
 def plot(x, y, y2=None, xlabel=None, ylabel=None, legend=[], save=False, filename=None):
     """Plot data points"""
     plt.style.use(['science'])
