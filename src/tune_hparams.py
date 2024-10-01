@@ -45,8 +45,16 @@ if __name__ == "__main__":
     config = OmegaConf.load("config/config.yaml")
     config.logging_dir = resolve_logging_dir(config)
 
+    if config.resume_optuna_dir:
+        storage = f"sqlite:///{config.resume_optuna_dir}/optuna.db"
+        config.logging_dir = config.resume_optuna_dir
+    else:
+        storage = f"sqlite:///{config.logging_dir}/optuna.db"
+
     study = optuna.create_study(
-        direction="maximize", 
+        study_name=config.expt_name,
+        storage=storage,
+        direction="maximize",
         pruner=optuna.pruners.MedianPruner(),
         load_if_exists=True
     )
@@ -61,4 +69,3 @@ if __name__ == "__main__":
     with open(os.path.join(config.logging_dir, "best_trial_params.txt"), 'w') as f:
         for key, value in trial.params.items():
             f.write(f"{key}: {value}\n")
-            

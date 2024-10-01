@@ -4,14 +4,14 @@
 # expt_name: DetectNoiseLabels_Agentic_v2_v3
 # expt_name: DetectNoiseLabels_Agentic_Onlyv3
 # expt_name: DetectNoiseLabels_Agentic_Onlyv3
-expt_name: Debug
+expt_name: Tune_Agentic
 
 ############ Used for most of the experiments ############
 
 seed: 0
 num_workers: 12
 plm: roberta-base
-num_epochs: 1
+num_epochs: 10
 lr: 1.0e-5
 batch_size: 16
 logging_dir: ./logs
@@ -64,4 +64,5 @@ num_agents: 5
 updated_train_dl_file: logs/20240926_113249_DetectNoiseLabels_Agentic_v2_v3/updated_train_dl.pt
 
 ########## Optuna ##########
-n_optuna_trails: 1
+n_optuna_trails: 100
+resume_optuna_dir: False

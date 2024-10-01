@@ -44,7 +44,7 @@ def _find_noisy_samples_agentic(config, train_dl, val_dl):
     for i, model in enumerate(models):
         # customise logging_dir per agent
         config.logging_dir = os.path.join(raw_logging_dir, f"agent_{i}")
-        trainer = get_trainer(config)
+        trainer = get_trainer(config, callbacks=[]) # no model checkpoint callback
         trainer.fit(model=model, train_dataloaders=train_dl, val_dataloaders=val_dl)
         
         model = LightningPLM.load_from_checkpoint(trainer.checkpoint_callback.best_model_path)

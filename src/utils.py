@@ -23,14 +23,18 @@ def get_trainer(config, devices="auto", callbacks=None):
                 monitor="val_loss",
                 save_top_k=1,
                 mode="min"
-            ),
-            EarlyStopping(
-                monitor="val_loss",
-                patience=3,
-                mode="min",
-                min_delta=0.01
             )
         ]
+
+    early_stopping = EarlyStopping(
+        monitor="val_loss",
+        patience=3,
+        mode="min",
+        min_delta=0.01
+    )
+
+    # always add early stopping
+    callbacks.append(early_stopping)
 
     trainer = L.Trainer(
         max_epochs=config.num_epochs,
