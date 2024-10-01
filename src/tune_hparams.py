@@ -42,7 +42,7 @@ def objective(trial: optuna.trial.Trial, config) -> float:
 
     
 if __name__ == "__main__":
-    config = OmegaConf.load("config/config.yaml")
+    config = OmegaConf.load("config/config_train.yaml")
     config.logging_dir = resolve_logging_dir(config)
 
     if config.resume_optuna_dir:

@@ -1,0 +1,18 @@
+############ Used for most of the experiments ############
+
+seed: 0
+num_workers: 12
+plm: roberta-base
+batch_size: 16
+
+# extra_columns_to_keep: ["article_id"]
+extra_columns_to_keep: []
+demographics: []
+# demographics: ['gender', 'education', 'race', 'age', 'income']
+feature_to_tokenise: ["essay"]
+
+save_predictions_to_disk: True # True or False
+load_from_checkpoint: logs/20240920_164626_Baseline/lightning_logs/version_15755097/checkpoints/epoch=6-step=147.ckpt
+
+####### 2023 ########
+test_file_list: ["data/NewsEmp2023/WASSA23_essay_level_test.tsv"]

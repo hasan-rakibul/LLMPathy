@@ -4,7 +4,6 @@ import logging
 import lightning as L
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
 
-
 import matplotlib.pyplot as plt
 import scienceplots
 
