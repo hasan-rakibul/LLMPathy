@@ -10,6 +10,8 @@ from utils import log_info, get_trainer, resolve_logging_dir
 from preprocess import DataModuleFromRaw
 from model import LightningPLM
 
+from agentic_noise_removal import _agentic_noise_removal
+
 logger = logging.getLogger(__name__)
 
 
@@ -21,10 +23,6 @@ def objective(trial: optuna.trial.Trial, config) -> float:
     config.noise_level = trial.suggest_float("noise_level", 0.1, 0.9)
     config.num_agents = trial.suggest_int("num_agents", 1, 5)
 
-    datamodule = DataModuleFromRaw(config)
-    train_dl = datamodule.get_train_dl(data_path_list=config.train_file_list)
-    val_dl = datamodule.get_val_dl(data_path_list=config.val_file_list)
-
     model = LightningPLM(config)
     trainer = get_trainer(
         config,
@@ -32,6 +30,11 @@ def objective(trial: optuna.trial.Trial, config) -> float:
             PyTorchLightningPruningCallback(trial, monitor="val_ccc"),
         ]
     )
+
+    train_dl = _agentic_noise_removal(config)
+
+    datamodule = DataModuleFromRaw(config)
+    val_dl = datamodule.get_val_dl(data_path_list=config.val_file_list)
 
     trainer.fit(model=model, train_dataloaders=train_dl, val_dataloaders=val_dl)
 
@@ -49,7 +52,7 @@ if __name__ == "__main__":
     )
 
     objective_param = partial(objective, config=config)
-    study.optimize(objective_param, n_trials=100, show_progress_bar=True)
+    study.optimize(objective_param, n_trials=config.n_optuna_trails, show_progress_bar=True)
 
     log_info(logger, f"Number of finished trials: {len(study.trials)}")
     trial = study.best_trial
@@ -58,3 +61,4 @@ if __name__ == "__main__":
     with open(os.path.join(config.logging_dir, "best_trial_params.txt"), 'w') as f:
         for key, value in trial.params.items():
             f.write(f"{key}: {value}\n")
+            

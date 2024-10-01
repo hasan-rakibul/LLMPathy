@@ -23,6 +23,8 @@ load_from_checkpoint: False # False or path to checkpoint file (.ckpt) of the va
 save_predictions_to_disk: True # True or False
 # load_from_checkpoint: logs/20240920_164626_Baseline/lightning_logs/version_15755097/checkpoints/epoch=6-step=147.ckpt
 
+save_agentics_to_disk: False # True or False
+
 # train_file_list: ["data/NewsEmp2022/messages_train_ready_for_WS_with_LLM.tsv", "./data/NewsEmp2023/WASSA23_essay_level_with_labels_train_with_LLM.tsv"]
 
 label_column: empathy
@@ -60,3 +62,6 @@ num_agents: 5
 
 # updated_train_dl_file: False
 updated_train_dl_file: logs/20240926_113249_DetectNoiseLabels_Agentic_v2_v3/updated_train_dl.pt
+
+########## Optuna ##########
+n_optuna_trails: 1

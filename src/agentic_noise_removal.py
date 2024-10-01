@@ -78,10 +78,11 @@ def _agentic_noise_removal(config):
     
     log_info(logger, f"HC: {len(hc_sample_ids)}, MC: {len(mc_sample_ids)}, LC: {len(lc_sample_ids)}")
     
-    # Saving noise_indices for analysis...
-    np.save(os.path.join(config.logging_dir, "hc_sample_ids_" + str(config.noise_level) + ".npy"), hc_sample_ids)
-    np.save(os.path.join(config.logging_dir, "mc_sample_ids_" + str(config.noise_level) + ".npy"), mc_sample_ids)
-    np.save(os.path.join(config.logging_dir, "lc_sample_ids_" + str(config.noise_level) + ".npy"), lc_sample_ids)
+    if config.save_agentics_to_disk:
+        # Saving noise_indices for analysis...
+        np.save(os.path.join(config.logging_dir, "hc_sample_ids_" + str(config.noise_level) + ".npy"), hc_sample_ids)
+        np.save(os.path.join(config.logging_dir, "mc_sample_ids_" + str(config.noise_level) + ".npy"), mc_sample_ids)
+        np.save(os.path.join(config.logging_dir, "lc_sample_ids_" + str(config.noise_level) + ".npy"), lc_sample_ids)
     
     ####### for mc_set or lc_set, update the label to llm_empathy
     # Convert indices to sets for quick lookup
@@ -97,9 +98,12 @@ def _agentic_noise_removal(config):
 
     log_info(logger, f"Updated labels for {len(mc_set) + len(lc_set)} samples")
 
-    # save updated train_dl
-    torch.save(train_dl, os.path.join(config.logging_dir, "updated_train_dl.pt"))
-    log_info(logger, f"Saved updated train_dl to {config.logging_dir}/updated_train_dl.pt")
+    if config.save_agentics_to_disk:
+        # save updated train_dl
+        torch.save(train_dl, os.path.join(config.logging_dir, "updated_train_dl.pt"))
+        log_info(logger, f"Saved updated train_dl to {config.logging_dir}/updated_train_dl.pt")
+
+    return train_dl
 
 if __name__ == "__main__":
     transformers.logging.set_verbosity_error()
@@ -107,4 +111,4 @@ if __name__ == "__main__":
     config.logging_dir = resolve_logging_dir(config) # update customised logging_dir
 
     L.seed_everything(config.seed)
-    _agentic_noise_removal(config)
+    _ = _agentic_noise_removal(config)
