@@ -1,9 +1,6 @@
 # python 3.12.3
 transformers >= 4.43.0
 datasets
-sentencepiece
-peft
-evaluate
 tensorboard
 pandas
 numpy
@@ -11,8 +8,19 @@ matplotlib
 scienceplots
 omegaconf
 
+# for Optuna hyperparameter optimisation
+optuna
+optuna-integration[pytorch-lightning]
+plotly # for visualisation
+kaleido # for visualisation
+scikit-learn # for calculation in visualisation
+
+## LoRA
+# sentencepiece
+# peft
+# evaluate
+
 ## wordcloud
-# scikit-learn
 # wordcloud
 
 ## agentic workflow

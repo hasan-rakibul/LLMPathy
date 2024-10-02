@@ -1,7 +1,7 @@
-resume_optuna_dir: False # False or dir of optuna.db file
+resume_optuna_dir: logs/20241002_151425_Tune_Agentic # False or dir of optuna.db file
 expt_name: Tune_Agentic # NOT used if any resume_optuna_dir is provided
 logging_dir: ./logs # NOT used if any resume_optuna_dir is provided
-n_optuna_trails: 5
+n_optuna_trails: 20
 
 objectives: ["val_loss", "val_ccc", "val_pearsonr"]
 directions: ["minimize", "maximize", "maximize"]

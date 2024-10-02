@@ -1,5 +1,6 @@
 import optuna
 from optuna.integration import PyTorchLightningPruningCallback
+import plotly # required for optuna.visualization
 
 import os
 import datetime
@@ -9,7 +10,7 @@ from omegaconf import OmegaConf
 from functools import partial
 import lightning as L
 
-from utils import log_info, get_trainer, resolve_logging_dir
+from utils import log_info, get_trainer
 from preprocess import DataModuleFromRaw
 from model import LightningPLM
 
@@ -78,6 +79,8 @@ if __name__ == "__main__":
     # but we have early stopping in the trainer, so it's fine
     pruner = optuna.pruners.NopPruner() if len(config.objectives) > 1 else optuna.pruners.MedianPruner()
 
+    assert len(config.objectives) == len(config.directions), "Number of objectives and directions must match"
+
     study = optuna.create_study(
         study_name=config.expt_name,
         storage=storage,
@@ -86,22 +89,30 @@ if __name__ == "__main__":
         load_if_exists=True
     )
 
+    study.set_metric_names(list(config.objectives)) # converted ListConfig to list, as it throws error
+
     objective_param = partial(objective, config=config)
     study.optimize(objective_param, n_trials=config.n_optuna_trails, show_progress_bar=True)
 
-    trial_results = study.trials_dataframe()
+    trial_results = study.trials_dataframe(multi_index=True)
     trial_results.to_csv(os.path.join(config.logging_dir, "trials_results.csv"))
 
     log_info(logger, f"Number of finished trials: {len(study.trials)}")
-    trial = study.best_trial
-    log_info(logger, f"Best trial:{trial.value}")
+    if len(config.objectives) > 1:
+        best_trials = study.best_trials
+        with open(os.path.join(config.logging_dir, "best_trials_params.txt"), 'w') as f:
+            for i, best_trail in enumerate(best_trials):
+                f.write(f"Best trial {i}:\n")
+                for key, value in best_trail.params.items():
+                    f.write(f"{key}: {value}\n")
+                f.write("\n")
+    else:
+        best_trial = study.best_trial
+        log_info(logger, f"Best trial:{best_trial.value}")
 
-    with open(os.path.join(config.logging_dir, "best_trial_params.txt"), 'w') as f:
-        for key, value in trial.params.items():
-            f.write(f"{key}: {value}\n")
+        with open(os.path.join(config.logging_dir, "best_trial_params.txt"), 'w') as f:
+            for key, value in best_trial.params.items():
+                f.write(f"{key}: {value}\n")
 
-    fig_1 = optuna.visualization.plot_slice(study)
-    fig_1.write_image(os.path.join(config.logging_dir, "Optuna_slice_plot.pdf"))
-
-    fig_2 = optuna.visualization.plot_param_importances(study)
-    fig_2.write_image(os.path.join(config.logging_dir, "Optuna_param_importances.pdf"))
+    fig = optuna.visualization.plot_param_importances(study)
+    fig.write_image(os.path.join(config.logging_dir, "Optuna_param_importances.pdf"))
