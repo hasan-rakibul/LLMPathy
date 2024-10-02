@@ -15,8 +15,13 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-def get_trainer(config, devices="auto", callbacks=None):
-    if callbacks is None:
+def get_trainer(config, devices="auto", extra_callbacks=None, enable_checkpointing=True):
+    """
+    By default, we have EarlyStopping and ModelCheckpoint callbacks.
+    If you want to add more callbacks, pass them in extra_callbacks.
+    """
+    if enable_checkpointing:
+        # have a ModelCheckpoint callback
         callbacks = [
             ModelCheckpoint(
                 monitor="val_loss",
@@ -24,16 +29,16 @@ def get_trainer(config, devices="auto", callbacks=None):
                 mode="min"
             )
         ]
-
+    
     early_stopping = EarlyStopping(
         monitor="val_loss",
         patience=3,
         mode="min",
         min_delta=0.01
     )
-
-    # always add early stopping
-    callbacks.append(early_stopping)
+    
+    callbacks = [early_stopping] # always add early stopping
+    callbacks.extend(extra_callbacks) if extra_callbacks else None
 
     trainer = L.Trainer(
         max_epochs=config.num_epochs,
@@ -42,7 +47,8 @@ def get_trainer(config, devices="auto", callbacks=None):
         logger=True,
         log_every_n_steps=10,
         callbacks=callbacks,
-        devices=devices
+        devices=devices,
+        enable_checkpointing=enable_checkpointing
     )
 
     return trainer

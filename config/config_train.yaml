@@ -3,8 +3,7 @@
 # expt_name: Baseline
 # expt_name: DetectNoiseLabels_Agentic_v2_v3
 # expt_name: DetectNoiseLabels_Agentic_Onlyv3
-# expt_name: DetectNoiseLabels_Agentic_Onlyv3
-expt_name: Tune_Agentic
+expt_name: DetectNoiseLabels_Agentic_Onlyv3
 
 ############ Used for most of the experiments ############
 
@@ -31,7 +30,9 @@ extra_columns_to_keep_train: ["llm_empathy"]
 
 max_length: 512
 demographics: []
-# demographics: ['gender', 'education', 'race', 'age', 'income']val_file_list: ["data/NewsEmp2023/WASSA23_essay_level_dev.tsv"]
+# demographics: ['gender', 'education', 'race', 'age', 'income']
+
+val_file_list: ["data/NewsEmp2023/WASSA23_essay_level_dev.tsv"]
 
 ############ 2022 and 2023 ############
 # train_file_list: ["data/NewsEmp2022/messages_train_ready_for_WS_with_LLM.tsv", "./data/NewsEmp2023/WASSA23_essay_level_with_labels_train_with_LLM.tsv"]
@@ -53,7 +54,3 @@ save_agentics_to_disk: False # True or False
 
 # updated_train_dl_file: False
 updated_train_dl_file: logs/20240926_113249_DetectNoiseLabels_Agentic_v2_v3/updated_train_dl.pt
-
-########## Tune hparams by Optuna ##########
-n_optuna_trails: 100
-resume_optuna_dir: False

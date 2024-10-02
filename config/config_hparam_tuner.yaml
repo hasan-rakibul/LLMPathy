@@ -1,0 +1,37 @@
+resume_optuna_dir: False # False or dir of optuna.db file
+expt_name: Tune_Agentic # NOT used if any resume_optuna_dir is provided
+logging_dir: ./logs # NOT used if any resume_optuna_dir is provided
+n_optuna_trails: 5
+
+objectives: ["val_loss", "val_ccc", "val_pearsonr"]
+directions: ["minimize", "maximize", "maximize"]
+
+# lr, noise_level, num_agents are to be tuned
+
+seed: 0
+num_workers: 12
+plm: roberta-base
+num_epochs: 10
+batch_size: 16
+
+save_agentics_to_disk: False # True or False
+updated_train_dl_file: False
+
+save_predictions_to_disk: False # won't save during val
+
+label_column: empathy
+llm_column: llm_empathy
+feature_to_tokenise: ["essay"]
+extra_columns_to_keep: []
+# extra_columns_to_keep: ["article_id"]
+extra_columns_to_keep_train: ["llm_empathy"]
+
+max_length: 512
+demographics: []
+# demographics: ['gender', 'education', 'race', 'age', 'income']
+
+train_file_list: ["data/NewsEmp2022/messages_train_ready_for_WS_with_LLM.tsv", "./data/NewsEmp2023/WASSA23_essay_level_with_labels_train_with_LLM.tsv"]
+val_file_list: ["data/NewsEmp2023/WASSA23_essay_level_dev.tsv"]
+
+# for 2022 and 2023, we have separate gold standard files
+val_goldstandard_file: data/NewsEmp2023/goldstandard_dev.tsv
