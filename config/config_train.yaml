@@ -1,11 +1,11 @@
-############ NOT used if any load_from_checkpoint is provided #######
+############ NOT used if any load_from_checkpoint or updated_train_dl_file is provided #######
 
-expt_name: Baseline-TrainedWith2023
+# expt_name: Baseline-TrainedWith2023
+# expt_name: Debug
 # expt_name: DetectNoiseLabels_Agentic_v2_v3
-# expt_name: DetectNoiseLabels_Agentic_Onlyv3
-# expt_name: DetectNoiseLabels_Agentic_Onlyv3
+expt_name: Agentic_Onlyv3
 
-val_only: True
+val_only: False
 
 ############ Used for most of the experiments ############
 
@@ -17,8 +17,8 @@ lr: 1.0e-5
 batch_size: 16
 logging_dir: ./logs
 
-# load_from_checkpoint: False # False or path to checkpoint file (.ckpt) of the vanilla model (not the agentic models)
-load_from_checkpoint: logs/20241003_065520_Baseline-TrainedWith2023/lightning_logs/version_16421343/checkpoints/epoch=2-step=147.ckpt
+load_from_checkpoint: False # False or path to checkpoint file (.ckpt) of the vanilla model (not the agentic models)
+# load_from_checkpoint: logs/20241003_065520_Baseline-TrainedWith2023/lightning_logs/version_16421343/checkpoints/epoch=2-step=147.ckpt
 
 save_predictions_to_disk: False # so that we don't save all val steps each epoch
 
@@ -35,15 +35,13 @@ max_length: 512
 demographics: []
 # demographics: ['gender', 'education', 'race', 'age', 'income']
 
-updated_train_dl_file: False
-# updated_train_dl_file: logs/20240926_113249_DetectNoiseLabels_Agentic_v2_v3/updated_train_dl.pt
-
+# updated_train_dl_file: False
+updated_train_dl_file: ./logs/20241003_113735_Agentic_Onlyv3/updated_train_dl.pt
 
 ############ 2022 and 2023 ############
 # train_file_list: ["data/NewsEmp2022/messages_train_ready_for_WS_with_LLM.tsv", "./data/NewsEmp2023/WASSA23_essay_level_with_labels_train_with_LLM.tsv"]
 
 ### for 2022 and 2023, we have separate gold standard files
-val_goldstandard_file: data/NewsEmp2023/goldstandard_dev.tsv
 
 ############ 2022 ############
 
@@ -51,8 +49,9 @@ val_goldstandard_file: data/NewsEmp2023/goldstandard_dev.tsv
 ############ 2023 ############
 train_file_list: ["./data/NewsEmp2023/WASSA23_essay_level_with_labels_train_with_LLM.tsv"]
 val_file_list: ["data/NewsEmp2023/WASSA23_essay_level_dev.tsv"]
+val_goldstandard_file: data/NewsEmp2023/goldstandard_dev.tsv
 
 ############ Agentic approach ############
-noise_level: 0.5
-num_agents: 5
-save_agentics_to_disk: False # True or False
+noise_level: 0.7
+num_agents: 3
+save_agentics_to_disk: True # saves indices and updated train_dl file

@@ -105,7 +105,7 @@ class LightningPLM(L.LightningModule):
         all_preds = torch.cat(self.training_step_outputs)
         all_labels = torch.cat(self.training_step_labels)
         self.log(
-            'train_pearsonr', 
+            'train_pcc', 
             self.pcc(all_preds, all_labels),
             logger=True,
             prog_bar=True,
@@ -140,7 +140,7 @@ class LightningPLM(L.LightningModule):
         all_preds = torch.cat(self.validation_step_outputs)
         all_labels = torch.cat(self.validation_step_labels)
         self.log(
-            'val_pearsonr',
+            'val_pcc',
             self.pcc(all_preds, all_labels),
             logger=True,
             prog_bar=True,

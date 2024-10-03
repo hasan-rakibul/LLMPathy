@@ -13,7 +13,7 @@ demographics: []
 feature_to_tokenise: ["essay"]
 
 # save_predictions_to_disk: True # True or False
-load_from_checkpoint: logs/20241003_065520_Baseline-TrainedWith2023/lightning_logs/version_16421343/checkpoints/epoch=2-step=147.ckpt
+load_from_checkpoint: logs/20241003_113735_Agentic_Onlyv3/lightning_logs/version_16429209/checkpoints/epoch=3-step=196.ckpt
 
 ####### 2023 ########
 test_file_list: ["data/NewsEmp2023/WASSA23_essay_level_test.tsv"]

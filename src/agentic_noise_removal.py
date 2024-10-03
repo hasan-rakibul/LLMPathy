@@ -107,7 +107,7 @@ def _agentic_noise_removal(config):
 
 if __name__ == "__main__":
     transformers.logging.set_verbosity_error()
-    config = OmegaConf.load("config/config.yaml")
+    config = OmegaConf.load("config/config_train.yaml")
     config.logging_dir = resolve_logging_dir(config) # update customised logging_dir
 
     L.seed_everything(config.seed)

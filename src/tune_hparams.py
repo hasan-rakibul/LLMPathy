@@ -35,7 +35,7 @@ def objective(trial: optuna.trial.Trial, config) -> float:
         extra_callbacks = None
     else:
         extra_callbacks = [
-            PyTorchLightningPruningCallback(trial, monitor="val_loss")
+            PyTorchLightningPruningCallback(trial, monitor="val_rmse")
         ]
 
     trainer = get_trainer(

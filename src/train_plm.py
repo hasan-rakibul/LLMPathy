@@ -61,7 +61,6 @@ def tain_vanilla_plm(config, train_dl=None):
 if __name__ == "__main__":
     transformers.logging.set_verbosity_error()
     config = OmegaConf.load("config/config_train.yaml")
-    config.logging_dir = resolve_logging_dir(config) # update customised logging_dir
 
     L.seed_everything(config.seed)
 
@@ -72,5 +71,6 @@ if __name__ == "__main__":
         config.logging_dir = os.path.dirname(config.updated_train_dl_file)
         tain_vanilla_plm(config, train_dl)
     else:
+        config.logging_dir = resolve_logging_dir(config) # update customised logging_dir
         tain_vanilla_plm(config)
         
