@@ -23,8 +23,7 @@ logger = logging.getLogger(__name__)
 def objective(trial: optuna.trial.Trial, config) -> float:
 
     # things to tune
-    config.lr = trial.suggest_float("lr", 1e-5, 1e-3, log=True)
-    config.noise_level = trial.suggest_float("noise_level", 0.1, 0.9)
+    config.noise_level = trial.suggest_float("noise_level", 0.0, 1.0)
     config.num_agents = trial.suggest_int("num_agents", 1, 5)
 
     L.seed_everything(config.seed)
@@ -94,7 +93,7 @@ if __name__ == "__main__":
     objective_param = partial(objective, config=config)
     study.optimize(objective_param, n_trials=config.n_optuna_trails, show_progress_bar=True)
 
-    trial_results = study.trials_dataframe(multi_index=True)
+    trial_results = study.trials_dataframe()
     trial_results.to_csv(os.path.join(config.logging_dir, "trials_results.csv"))
 
     log_info(logger, f"Number of finished trials: {len(study.trials)}")

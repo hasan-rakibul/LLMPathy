@@ -20,24 +20,26 @@ def get_trainer(config, devices="auto", extra_callbacks=None, enable_checkpointi
     By default, we have EarlyStopping and ModelCheckpoint callbacks.
     If you want to add more callbacks, pass them in extra_callbacks.
     """
+    # early stopping callback is always there
+    callbacks = [
+        EarlyStopping(
+            monitor="val_loss",
+            patience=3,
+            mode="min",
+            min_delta=0.01
+        )
+    ]
+    
     if enable_checkpointing:
         # have a ModelCheckpoint callback
-        callbacks = [
+        callbacks.append(
             ModelCheckpoint(
                 monitor="val_loss",
                 save_top_k=1,
                 mode="min"
             )
-        ]
+        )
     
-    early_stopping = EarlyStopping(
-        monitor="val_loss",
-        patience=3,
-        mode="min",
-        min_delta=0.01
-    )
-    
-    callbacks = [early_stopping] # always add early stopping
     callbacks.extend(extra_callbacks) if extra_callbacks else None
 
     trainer = L.Trainer(

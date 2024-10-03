@@ -102,7 +102,8 @@ class DataModuleFromRaw:
             batched=True,
             remove_columns=self.config.feature_to_tokenise
         )
-        all_data_hf = all_data_hf.rename_column(self.config.label_column, 'labels')
+        if have_label:
+            all_data_hf = all_data_hf.rename_column(self.config.label_column, 'labels')
         all_data_hf.set_format('torch')
         return all_data_hf
     

@@ -1,15 +1,16 @@
-resume_optuna_dir: logs/20241002_151425_Tune_Agentic # False or dir of optuna.db file
-expt_name: Tune_Agentic # NOT used if any resume_optuna_dir is provided
+resume_optuna_dir: False # False or dir of optuna.db file
+expt_name: Tune_OnlyAgentic # NOT used if any resume_optuna_dir is provided
 logging_dir: ./logs # NOT used if any resume_optuna_dir is provided
 n_optuna_trails: 20
 
 objectives: ["val_loss", "val_ccc", "val_pearsonr"]
 directions: ["minimize", "maximize", "maximize"]
 
-# lr, noise_level, num_agents are to be tuned
+# noise_level, num_agents are to be tuned
 
 seed: 0
 num_workers: 12
+lr: 1.0e-5
 plm: roberta-base
 num_epochs: 10
 batch_size: 16
