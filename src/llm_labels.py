@@ -1,67 +1,130 @@
 import os
-import transformers
-import torch
+from groq import Groq
+from typing import Dict, List
+import numpy as np
+import pandas as pd
+from utils import log_info, log_debug
+# from tenacity import retry, stop_after_attempt, wait_exponential
+import logging
+import argparse
 
-def llm_groq():
-    from groq import Groq
-    client = Groq(
-        api_key=os.environ.get("GROQ_API_KEY")
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+client = Groq(
+    api_key=os.environ.get("GROQ_API_KEY")
+)
+
+# taken from https://github.com/meta-llama/llama-recipes/blob/main/recipes/quickstart/Prompt_Engineering_with_Llama_3.ipynb
+def as_system(content: str) -> Dict:
+    return {"role": "system", "content": content}
+
+def as_assistant(content: str) -> Dict:
+    return {"role": "assistant", "content": content}
+
+def as_user(essay: str) -> Dict:
+    content = f"Essay: ```{essay}\n```\
+        Now, provide scores with respect to Batson's empathy scale.\
+        That is, provide scores between 1.0 and 7.0 for each of the following emotions: sympathetic, moved, compassionate, tender, warm, softhearted.\
+        Note that 1 == not feeling the emotion at all, and 7 == extremely feeling the emotion."
+    return {"role": "user", "content": content}
+
+# @retry(wait=wait_exponential(multiplier=10, min=20, max=60), stop=stop_after_attempt(5))
+def chat_completion(
+    messages: List[Dict],
+    model = "llama3-70b-8192",
+    temperature: float = 0.0, # 0.0 is deterministic
+    top_p: float = 0.01,
+) -> str:
+    chat_response = client.chat.completions.create(
+        messages=messages,
+        model=model,
+        temperature=temperature,
+        top_p=top_p,
+    )
+    return chat_response.choices[0].message.content
+        
+def _perse_scores(subscale_scores: str) -> float:
+    log_debug(logger, f"Subscale scores: {subscale_scores}")
+    score_array = np.array([float(s) for s in subscale_scores.split(",")])
+    return np.mean(score_array)
+
+def completion(question: Dict) -> str:
+    system = as_system(
+        "Your task is to measure the empathy of individuals based on their written essays.\
+        You will assess empathy using Batson's definition, which specifically measures how the subject is feeling each of the following six emotions: sympathetic, moved, compassionate, tender, warm, and softhearted.\
+        Human subjects wrote the essays after reading a newspaper article involving harm to individuals, groups of people, nature, etc. The essay is provided to you within triple backticks.\
+        For each emotion, you must provide comma-separated scores, each between 1.0 and 7.0, where a score of 1 means the individual is not feeling the emotion at all, and a score of 7 means the individual is extremely feeling the emotion.\
+        You must not provide any other content than the scores."
     )
 
-    chat_completion = client.chat.completions.create(
-        messages=[
-            {
-                "role": "user",
-                "content": "What is empathy?"
-            }
-        ],
-        model="llama3-70b-8192"
+    prompt = [system]
+    
+    prompt.append(question)
+    log_debug(logger, f"Prompt: {prompt}")
+
+    subscale_scores = chat_completion(
+        prompt
     )
+    return subscale_scores
 
-    print(chat_completion.choices[0].message.content)
+def _measure_empathy_LLM(file_path:str) -> None:
+    df = pd.read_csv(file_path, sep="\t")
+    assert df["essay"].isnull().sum() == 0, "There are missing essay in the dataset"
+    assert df["essay"].isna().sum() == 0, "There are NA essay in the dataset"
 
+    if "llm_empathy" in df.columns:
+        log_info(logger, "llm_empathy exists in columns. So, in resume mode.")
+        resume = True
+        save_path = file_path # overwrite the file in resume mode
+    else:
+        resume = False
+        save_path = file_path.replace(".tsv", "_llm.tsv")
 
-def authenticate_huggingface():
-    from huggingface_hub import login
-    login(token=os.environ.get("HF_API_KEY"))
+    for index, row in df.iterrows():
+        # skip if already done
+        if resume:
+            if not np.isnan(row["llm_empathy"]):
+                log_info(logger, f"Skipping index {index}, as it has llm_empathy: {row["llm_empathy"]}")
+                continue
 
-def llm_llama():
-    # authenticate_huggingface()
+        question = as_user(
+            essay=row["essay"]
+        )
+        probably_subscale_scores = completion(question)
+        try:
+            empathy_score = _perse_scores(probably_subscale_scores)
+        except:
+            log_info(logger, f"Failed to parse scores for index: {index} and essay: {row["essay"]["50"]}")
+            log_info(logger, f"The failed scores: {probably_subscale_scores}")
+            log_info(logger, f"Trying again for the above essay...")
 
-    model_id = "meta-llama/Meta-Llama-3.1-70B"
+            # ask again as LLMs may give correct answer this time
+            question = as_user(
+                essay=row["essay"]
+            )
+            probably_subscale_scores = completion(question)
+            try:
+                empathy_score = _perse_scores(probably_subscale_scores)
+            except:
+                log_info(logger, f"Failed to parse scores for index: {index} and essay: {row["essay"]["50"]}")
+                log_info(logger, f"The failed scores: {probably_subscale_scores}")
+                log_info(logger, f"Failed again. So, skipping this essay.")
+                empathy_score = np.nan
+        
+        df.loc[index, "llm_empathy"] = empathy_score
+        log_info(logger, f"Index: {index}, Essay: {row['essay'][:50]}..., Empathy score: {empathy_score}")
 
-    pipeline = transformers.pipeline(
-        "text-generation", model=model_id,
-        model_kwargs={"torch_dtype": torch.bfloat16},
-        device_map="auto",
-        max_new_tokens=20
-    )
-    print(pipeline("Hey how are you doing today?"))
+        # save time to time
+        if index % 5 == 0:
+            df.to_csv(save_path, sep="\t", index=False)
 
-"""
-prompt = [
-    {
-        "role": "system",
-        "content": f"You are an AI model that annotates written essays to provide an empathy score between 1.0 to 7.0 based on the definition of empathy.
-         The essays were written by human participants after reading a newspaper article involving harm to individuals, groups of people, nature, etc. 
-         The essay is provided to you within triple backticks. 
-         Your response must contain one and only empathy score."
-    }
-]
-seed_index = [0, 7, 23]
-
-for index in seed_index:
-    prompt.append({
-        "role": "user",
-        "content": f"Essay: ```{train.loc[index, 'demographic_essay']}```"
-    })
-    prompt.append({
-        "role": "assistant",
-        "content": f"{train.loc[index, 'empathy']:.1f}"
-    })
-"""
+    # save at the end
+    df.to_csv(save_path, sep="\t", index=False)
 
 if __name__ == "__main__":
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0, 1, 2, 3, 4, 5, 6, 7" # seems only the first one is being used; need to investigate
-    # llm_groq()
-    llm_llama()
+    parser = argparse.ArgumentParser(description='Measure empathy using LLM')
+    parser.add_argument('--file_path', type=str, help='File path to the dataset')
+    args = parser.parse_args()
+
+    _measure_empathy_LLM(args.file_path)
