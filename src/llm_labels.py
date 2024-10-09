@@ -4,7 +4,7 @@ from typing import Dict, List
 import numpy as np
 import pandas as pd
 from utils import log_info, log_debug
-# from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential
 import logging
 import argparse
 
@@ -12,7 +12,8 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 client = Groq(
-    api_key=os.environ.get("GROQ_API_KEY")
+    api_key=os.environ.get("GROQ_API_KEY"),
+    max_retries=0 # disable retry as we are handling it manually
 )
 
 # taken from https://github.com/meta-llama/llama-recipes/blob/main/recipes/quickstart/Prompt_Engineering_with_Llama_3.ipynb
@@ -29,20 +30,22 @@ def as_user(essay: str) -> Dict:
         Note that 1 == not feeling the emotion at all, and 7 == extremely feeling the emotion."
     return {"role": "user", "content": content}
 
-# @retry(wait=wait_exponential(multiplier=10, min=20, max=60), stop=stop_after_attempt(5))
+@retry(wait=wait_exponential(multiplier=10, min=20, max=100), stop=stop_after_attempt(5))
 def chat_completion(
     messages: List[Dict],
-    model = "llama3-70b-8192",
+    model: str = "llama3-70b-8192",
     temperature: float = 0.0, # 0.0 is deterministic
     top_p: float = 0.01,
 ) -> str:
-    chat_response = client.chat.completions.create(
+    response = client.chat.completions.create(
         messages=messages,
         model=model,
         temperature=temperature,
         top_p=top_p,
     )
-    return chat_response.choices[0].message.content
+    response_content = response.choices[0].message.content
+    
+    return response_content
         
 def _perse_scores(subscale_scores: str) -> float:
     log_debug(logger, f"Subscale scores: {subscale_scores}")
