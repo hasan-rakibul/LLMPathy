@@ -107,7 +107,9 @@ def _agentic_noise_removal(config):
 
 if __name__ == "__main__":
     transformers.logging.set_verbosity_error()
-    config = OmegaConf.load("config/config_train.yaml")
+    config = OmegaConf.load("config/config_agentic_noise_removal.yaml")
+    config.load_from_checkpoint = False # no resume is supported
+
     config.logging_dir = resolve_logging_dir(config) # update customised logging_dir
 
     L.seed_everything(config.seed)

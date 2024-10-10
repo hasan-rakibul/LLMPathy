@@ -17,6 +17,9 @@ src/archived/
 req_resources.sh
 .make_env_ready.sh
 
+# slurm output files
+*.out
+ 
 .python-version
 
 # Byte-compiled / optimized / DLL files

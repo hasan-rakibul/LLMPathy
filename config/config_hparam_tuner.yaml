@@ -1,7 +1,7 @@
-resume_optuna_dir: logs/20241003_103546_Tune_OnlyAgentic_Only2023 # False or dir of optuna.db file
-expt_name: Tune_OnlyAgentic_Only2023 # NOT used if any resume_optuna_dir is provided
+resume_optuna_dir: False # logs/20241003_103546_Tune_OnlyAgentic_Only2023 # False or dir of optuna.db file
+expt_name: Tune_OnlyAgentic_Only2022 # NOT used if any resume_optuna_dir is provided
 logging_dir: ./logs # NOT used if any resume_optuna_dir is provided
-n_optuna_trails: 15
+n_optuna_trails: 20
 
 objectives: ["val_pcc", "val_ccc", "val_rmse"]
 directions: ["maximize", "maximize", "minimize"]
@@ -31,9 +31,15 @@ max_length: 512
 demographics: []
 # demographics: ['gender', 'education', 'race', 'age', 'income']
 
+####### 2023 #######
 # train_file_list: ["data/NewsEmp2022/messages_train_ready_for_WS_with_LLM.tsv", "./data/NewsEmp2023/WASSA23_essay_level_with_labels_train_with_LLM.tsv"]
-train_file_list: ["./data/NewsEmp2023/WASSA23_essay_level_with_labels_train_with_LLM.tsv"]
+# train_file_list: ["./data/NewsEmp2023/WASSA23_essay_level_with_labels_train_with_LLM.tsv"]
 
-val_file_list: ["data/NewsEmp2023/WASSA23_essay_level_dev.tsv"]
+# val_file_list: ["data/NewsEmp2023/WASSA23_essay_level_dev.tsv"]
 # for 2022 and 2023, we have separate gold standard files
-val_goldstandard_file: data/NewsEmp2023/goldstandard_dev.tsv
+# val_goldstandard_file: data/NewsEmp2023/goldstandard_dev.tsv
+
+####### 2022 #######
+train_file_list: ["data/NewsEmp2022/messages_train_ready_for_WS_with_LLM.tsv"]
+val_file_list: ["data/NewsEmp2022/messages_dev_features_ready_for_WS_2022.tsv"]
+val_goldstandard_file: data/NewsEmp2022/goldstandard_dev_2022.tsv

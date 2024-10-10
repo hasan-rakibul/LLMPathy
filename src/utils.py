@@ -23,10 +23,10 @@ def get_trainer(config, devices="auto", extra_callbacks=None, enable_checkpointi
     # early stopping callback is always there
     callbacks = [
         EarlyStopping(
-            monitor="val_loss",
-            patience=3,
-            mode="min",
-            min_delta=0.01
+            monitor="val_ccc",
+            patience=5,
+            mode="max",
+            min_delta=0.0001
         )
     ]
     
