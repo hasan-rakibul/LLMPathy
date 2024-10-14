@@ -8,6 +8,8 @@ from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, DataCollatorWithPadding
 from datasets import Dataset
 import logging
+from sklearn.preprocessing import MinMaxScaler
+
 from utils import log_info
 
 logger = logging.getLogger(__name__)
@@ -36,7 +38,6 @@ class DataModuleFromRaw:
 
         # keep revent columns only
         columns_to_keep = self.config.feature_to_tokenise + \
-            self.config.demographics + \
             self.config.extra_columns_to_keep
 
         # if it is val of 2022 and 2023, the labels are separate files
@@ -55,16 +56,26 @@ class DataModuleFromRaw:
             if not val: # means it is train
                 columns_to_keep.extend(self.config.extra_columns_to_keep_train) # this is a list
         
-        data = data[columns_to_keep]
+        selected_data = data[columns_to_keep]
 
-        log_info(logger, f"Columns with NaN values: {data.columns[data.isna().any()].tolist()}")
-        data = data.dropna() # drop NaN values
-        log_info(logger, f"Removed NaN values if existed. {len(data)} samples remaining.\n")
+        if len(self.config.demographics) > 0:
+            numeric_data = data[self.config.demographics]
+            scaler = MinMaxScaler()
+            numeric_data = pd.DataFrame(
+                scaler.fit_transform(numeric_data),
+                columns=self.config.demographics
+            )
+            selected_data = pd.concat([selected_data, numeric_data], axis=1)
+ 
+        log_info(logger, f"Columns with NaN values: {selected_data.columns[selected_data.isna().any()].tolist()}")
+        selected_data = selected_data.dropna() # drop NaN values
+        log_info(logger, f"Removed NaN values if existed. {len(selected_data)} samples remaining.\n")
 
-        assert data.isna().any().any() == False, "There are still NaN values in the data."
-        assert data.isnull().any().any() == False, "The are still null values in the data"
-        
-        return data.copy() # return a copy to avoid modifying the original data
+        assert selected_data.isna().any().any() == False, "There are still NaN values in the data."
+        assert selected_data.isnull().any().any() == False, "The are still null values in the data"
+
+       
+        return selected_data.copy() # return a copy to avoid modifying the original data
 
     def _tokeniser_fn(self, sentence):
         if len(self.config.feature_to_tokenise) == 1: # only one feature

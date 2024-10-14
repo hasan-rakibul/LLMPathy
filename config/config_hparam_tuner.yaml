@@ -1,4 +1,4 @@
-resume_optuna_dir: False # logs/20241003_103546_Tune_OnlyAgentic_Only2023 # False or dir of optuna.db file
+resume_optuna_dir: logs/20241010_075602_Tune_OnlyAgentic_Only2022 # False or dir of optuna.db file
 expt_name: Tune_OnlyAgentic_Only2022 # NOT used if any resume_optuna_dir is provided
 logging_dir: ./logs # NOT used if any resume_optuna_dir is provided
 n_optuna_trails: 20

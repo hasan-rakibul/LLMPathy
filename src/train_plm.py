@@ -11,7 +11,7 @@ from model import LightningPLM
 
 logger = logging.getLogger(__name__)
 
-def tain_vanilla_plm(config, train_dl=None):
+def train_vanilla_plm(config, train_dl=None):
     datamodule = DataModuleFromRaw(config)
     
     val_dl = datamodule.get_val_dl(data_path_list=config.val_file_list)
@@ -33,7 +33,7 @@ def tain_vanilla_plm(config, train_dl=None):
                 val_dataloaders=val_dl,
                 ckpt_path=config.load_from_checkpoint
             )
-        else:        
+        else:
             trainer.fit(
                 model=model,
                 train_dataloaders=train_dl,
@@ -58,19 +58,25 @@ def tain_vanilla_plm(config, train_dl=None):
     model.config.save_predictions_to_disk = True # save final predictions to disk
     trainer.validate(model=model, dataloaders=val_dl)
 
+
 if __name__ == "__main__":
     transformers.logging.set_verbosity_error()
     config = OmegaConf.load("config/config_train.yaml")
 
     L.seed_everything(config.seed)
 
+    if config.debug_mode:
+        # delete the logs
+        config.logging_dir = "./tmp"
+        log_info(logger, "Debug mode is on. Using {config.logging_dir} for storing log files.")
+    
     if config.updated_train_dl_file:
         train_dl = torch.load(config.updated_train_dl_file, weights_only=False)
         log_info(logger, f"Loaded updated train_dl from {config.updated_train_dl_file}")
         log_info(logger, f"Total number of training samples: {len(train_dl.dataset)}")
         config.logging_dir = os.path.dirname(config.updated_train_dl_file)
-        tain_vanilla_plm(config, train_dl)
+        train_vanilla_plm(config, train_dl)
     else:
         config.logging_dir = resolve_logging_dir(config) # update customised logging_dir
-        tain_vanilla_plm(config)
+        train_vanilla_plm(config)
         

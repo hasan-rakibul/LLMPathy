@@ -7,19 +7,74 @@ from torchmetrics import MeanSquaredError
 import os
 import logging
 import pandas as pd
+import torch.nn as nn
 from utils import log_info
 
 logger = logging.getLogger(__name__)
 
+# taken and modified from our LLM-GEm work
+class RobertaRegressor(nn.Module):
+    def __init__(self, config):
+        super(RobertaRegressor, self).__init__()
+
+        self.config = config
+        fc_arch = self.config.fc_arch
+
+        self.transformer = AutoModelForSequenceClassification.from_pretrained(
+            pretrained_model_name_or_path=self.config.plm,
+            num_labels=fc_arch[0]
+        )
+        
+        # pre-fusion layer
+        self.pre_fusion = nn.Sequential(
+            nn.Linear(fc_arch[0], fc_arch[1]),
+            nn.Tanh(),
+            nn.Dropout(0.2)
+        )
+
+        # fusion layer
+        fusion_input_dim = fc_arch[1] + len(config.demographics)
+        self.fusion = nn.Sequential(
+            nn.Linear(fusion_input_dim, fc_arch[2]),
+            nn.Tanh(),
+            nn.Dropout(0.2)
+        )
+
+        # output layer
+        self.output = nn.Linear(fc_arch[-2], fc_arch[-1])
+
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        demographic_vector=None
+    ):
+
+        x = self.transformer(
+            input_ids= input_ids,
+            attention_mask=attention_mask,
+        )
+        x = self.pre_fusion(x.logits) # x.logits shape: (batch_size, num_labels)
+        
+        if demographic_vector is not None:
+            x = torch.cat([x, demographic_vector], 1)        
+        
+        x = self.fusion(x)
+        x = self.output(x)
+        return x.squeeze(-1) # remove the last dimension
+    
 class LightningPLM(L.LightningModule):
     def __init__(self, config):
         super().__init__()
         self.save_hyperparameters()
         self.config = config
-        self.model = AutoModelForSequenceClassification.from_pretrained(
-            pretrained_model_name_or_path=self.config.plm,
-            num_labels=1 # regression
-        )
+
+        # self.model = AutoModelForSequenceClassification.from_pretrained(
+        #     pretrained_model_name_or_path=self.config.plm,
+        #     num_labels=1 # regression
+        # )
+        self.model = RobertaRegressor(self.config)
+
         self.training_step_outputs = []
         self.training_step_labels = []
         self.validation_step_outputs = []
@@ -30,12 +85,26 @@ class LightningPLM(L.LightningModule):
         self.ccc = ConcordanceCorrCoef()
         self.rmse = MeanSquaredError(squared=False) # root mean squared error
 
-    def forward(self, input_ids, attention_mask):
-        outputs = self.model(
-            input_ids=input_ids,
-            attention_mask=attention_mask
-        )
-        return outputs.logits.squeeze(-1) # remove the last dimension
+    def forward(self, batch):
+        if len(self.config.demographics) > 0:
+            demographic_vector = torch.cat(
+                [batch[col].unsqueeze(1) for col in self.config.demographics], dim=1
+            ) # shape: (batch_size, num_demographics)
+        else:
+            demographic_vector = None
+            
+        return self.model(
+            input_ids=batch['input_ids'],
+            attention_mask=batch['attention_mask'],
+            demographic_vector=demographic_vector
+        )            
+
+    # def forward(self, input_ids, attention_mask):
+    #     outputs = self.model(
+    #         input_ids=input_ids,
+    #         attention_mask=attention_mask
+    #     )
+    #     return outputs.logits.squeeze(-1) # remove the last dimension
     
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(
@@ -92,7 +161,7 @@ class LightningPLM(L.LightningModule):
                 f.write(f"RMSE: {rmse_score}\n")
 
     def training_step(self, batch, batch_idx):
-        outputs = self._outputs_from_batch(batch)
+        outputs = self(batch)
         loss = torch.nn.functional.mse_loss(outputs, batch['labels'])
         self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
         
@@ -129,7 +198,7 @@ class LightningPLM(L.LightningModule):
         self.training_step_labels.clear()
     
     def validation_step(self, batch, batch_idx):
-        outputs = self._outputs_from_batch(batch)
+        outputs = self(batch)
         loss = torch.nn.functional.mse_loss(outputs, batch['labels'])
         self.log('val_loss', loss, on_step=True, on_epoch=True, logger=True, prog_bar=True, sync_dist=True)
 
@@ -169,7 +238,7 @@ class LightningPLM(L.LightningModule):
 
     # cannot be made to run on a single GPU
     def test_step(self, batch, batch_idx):
-        outputs = self._outputs_from_batch(batch)
+        outputs = self(batch)
         self.test_step_outputs.append(outputs)
         if 'labels' in batch:
             self.test_step_labels.append(batch['labels'])

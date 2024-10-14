@@ -1,9 +1,10 @@
 ############ NOT used if any load_from_checkpoint or updated_train_dl_file is provided #######
 
-# expt_name: Baseline-TrainedWith2023
-# expt_name: Debug
+debug_mode: False 
+
+expt_name: Baseline-Demographics-TrainedWith2023
 # expt_name: DetectNoiseLabels_Agentic_v2_v3
-expt_name: Agentic_Onlyv3_Strict-EarlyStopping
+# expt_name: Agentic_Onlyv3_Strict-EarlyStopping
 
 val_only: False
 
@@ -16,6 +17,7 @@ num_epochs: 10
 lr: 1.0e-5
 batch_size: 16
 logging_dir: ./logs
+fc_arch: [768, 512, 256, 1] # [out_transforer, out_pre_fusion, out_fusion, out]
 
 load_from_checkpoint: False # False or path to checkpoint file (.ckpt) of the vanilla model (not the agentic models)
 # load_from_checkpoint: logs/20241003_065520_Baseline-TrainedWith2023/lightning_logs/version_16421343/checkpoints/epoch=2-step=147.ckpt
@@ -32,11 +34,11 @@ extra_columns_to_keep: []
 extra_columns_to_keep_train: ["llm_empathy"]
 
 max_length: 512
-demographics: []
-# demographics: ['gender', 'education', 'race', 'age', 'income']
+# demographics: []
+demographics: ['gender', 'education', 'race', 'age', 'income']
 
-# updated_train_dl_file: False # if running baseline
-updated_train_dl_file: ./logs/20241003_113735_Agentic_Onlyv3/updated_train_dl.pt
+updated_train_dl_file: False # if running baseline
+# updated_train_dl_file: ./logs/20241003_113735_Agentic_Onlyv3/updated_train_dl.pt
 
 ############ 2022 and 2023 ############
 # train_file_list: ["data/NewsEmp2022/messages_train_ready_for_WS_with_LLM.tsv", "./data/NewsEmp2023/WASSA23_essay_level_with_labels_train_with_LLM.tsv"]

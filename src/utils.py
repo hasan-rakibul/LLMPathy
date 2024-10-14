@@ -14,6 +14,7 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S',
     level=logging.INFO
 )
+logger = logging.getLogger(__name__)
 
 def get_trainer(config, devices="auto", extra_callbacks=None, enable_checkpointing=True):
     """
@@ -50,7 +51,9 @@ def get_trainer(config, devices="auto", extra_callbacks=None, enable_checkpointi
         log_every_n_steps=10,
         callbacks=callbacks,
         devices=devices,
-        enable_checkpointing=enable_checkpointing
+        enable_checkpointing=enable_checkpointing,
+        limit_train_batches=0.1 if config.debug_mode else 1.0,
+        limit_val_batches=0.1 if config.debug_mode else 1.0,
     )
 
     return trainer
