@@ -24,18 +24,25 @@ class RobertaRegressor(nn.Module):
             pretrained_model_name_or_path=self.config.plm,
             num_labels=fc_arch[0]
         )
+
+        if config.freeze_plm:
+            log_info(logger, "Freezing the PLM weights")
+            for param in self.transformer.roberta.parameters():
+                param.requires_grad = False
         
         # pre-fusion layer
         self.pre_fusion = nn.Sequential(
+            nn.Tanh(), # as transformer outputs logits
+            nn.Dropout(0.4),
             nn.Linear(fc_arch[0], fc_arch[1]),
             nn.Tanh(),
-            nn.Dropout(0.2)
+            nn.Dropout(0.3)
         )
 
         # fusion layer
-        fusion_input_dim = fc_arch[1] + len(config.demographics)
+        fusion_input_dim = fc_arch[-3] + len(config.demographics)
         self.fusion = nn.Sequential(
-            nn.Linear(fusion_input_dim, fc_arch[2]),
+            nn.Linear(fusion_input_dim, fc_arch[-2]),
             nn.Tanh(),
             nn.Dropout(0.2)
         )
@@ -54,7 +61,9 @@ class RobertaRegressor(nn.Module):
             input_ids= input_ids,
             attention_mask=attention_mask,
         )
-        x = self.pre_fusion(x.logits) # x.logits shape: (batch_size, num_labels)
+        x = x.logits # shape: (batch_size, num_labels)
+        
+        x = self.pre_fusion(x)
         
         if demographic_vector is not None:
             x = torch.cat([x, demographic_vector], 1)        
@@ -68,11 +77,8 @@ class LightningPLM(L.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         self.config = config
+        self.learning_rate = self.config.lr
 
-        # self.model = AutoModelForSequenceClassification.from_pretrained(
-        #     pretrained_model_name_or_path=self.config.plm,
-        #     num_labels=1 # regression
-        # )
         self.model = RobertaRegressor(self.config)
 
         self.training_step_outputs = []
@@ -99,17 +105,10 @@ class LightningPLM(L.LightningModule):
             demographic_vector=demographic_vector
         )            
 
-    # def forward(self, input_ids, attention_mask):
-    #     outputs = self.model(
-    #         input_ids=input_ids,
-    #         attention_mask=attention_mask
-    #     )
-    #     return outputs.logits.squeeze(-1) # remove the last dimension
-    
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(
             self.model.parameters(),
-            lr=self.config.lr,
+            lr=self.learning_rate,
             betas=(0.9, 0.98),
             eps=1e-06,
             weight_decay=0.1
@@ -117,7 +116,7 @@ class LightningPLM(L.LightningModule):
         lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer,
             mode='min',
-            patience=3,
+            patience=1,
             threshold=0.001
         )
         return {

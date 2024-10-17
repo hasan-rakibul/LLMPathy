@@ -41,15 +41,18 @@ class DataModuleFromRaw:
             self.config.extra_columns_to_keep
 
         # if it is val of 2022 and 2023, the labels are separate files
-        if val and ("2022" in path or "2023" in path):
-            goldstandard = pd.read_csv(
-                self.config.val_goldstandard_file, 
-                sep='\t',
-                header=None # had no header in the file
-            )
-            # first column is empathy
-            goldstandard = goldstandard.rename(columns={0: self.config.label_column})
-            data = pd.concat([data, goldstandard], axis=1)
+        if val:
+            try:
+                goldstandard = pd.read_csv(
+                    self.config.val_goldstandard_file, 
+                    sep='\t',
+                    header=None # had no header in the file
+                )
+                # first column is empathy
+                goldstandard = goldstandard.rename(columns={0: self.config.label_column})
+                data = pd.concat([data, goldstandard], axis=1)
+            except:
+                log_info(logger, "No goldstandard file is read. Assuming it is not required.")
 
         if have_label:
             columns_to_keep.append(self.config.label_column)

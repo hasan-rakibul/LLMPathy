@@ -1,0 +1,24 @@
+seed: 0
+num_workers: 12
+plm: roberta-base
+num_epochs: 20
+lr: 1.0e-5
+batch_size: 16
+logging_dir: ./logs
+fc_arch: [768, 512, 256, 1] # [out_transforer, out_pre_fusion, out_fusion, out]
+freeze_plm: False
+lr_find: False  # unfornately, it didn't work for me
+
+label_column: empathy
+llm_column: llm_empathy
+feature_to_tokenise: ["essay"]
+# feature_to_tokenise: ["demographic_essay"]
+# extra_columns_to_keep: ["article_id"]
+extra_columns_to_keep: []
+
+### extra column in train only
+extra_columns_to_keep_train: ["llm_empathy"]
+
+max_length: 512
+# demographics: []
+demographics: ['gender', 'education', 'race', 'age', 'income']

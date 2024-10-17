@@ -1,7 +1,7 @@
 #!/bin/bash
  
 #SBATCH --job-name=TUNE-HPARAMS
-#SBATCH --time=6:00:00
+#SBATCH --time=8:00:00
 #SBATCH --nodes=1
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:1

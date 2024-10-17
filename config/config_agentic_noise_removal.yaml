@@ -1,47 +1,25 @@
-# expt_name: Debug
-# expt_name: DetectNoiseLabels_Agentic_v2_v3
-expt_name: Agentic_Onlyv2_Strict-EarlyStopping
+debug_mode: False
+
+expt_name: Agentic-2022-2023-EssayDn
 
 ############ Agentic approach ############
-noise_level: 0.7
+noise_level: 0.3
 num_agents: 3
 save_agentics_to_disk: True # saves indices and updated train_dl file
 
-############ Used for most of the experiments ############
-seed: 0
-num_workers: 12
-plm: roberta-base
-num_epochs: 10
-lr: 1.0e-5
-batch_size: 16
-logging_dir: ./logs
-
 save_predictions_to_disk: False # so that we don't save all val steps each epoch
 
-label_column: empathy
-llm_column: llm_empathy
-feature_to_tokenise: ["essay"]
-# extra_columns_to_keep: ["article_id"]
-extra_columns_to_keep: []
-
-### extra column in train only
-extra_columns_to_keep_train: ["llm_empathy"]
-
-max_length: 512
-demographics: []
-# demographics: ['gender', 'education', 'race', 'age', 'income']
-
 ############ 2022 and 2023 ############
-# train_file_list: ["data/NewsEmp2022/messages_train_ready_for_WS_with_LLM.tsv", "./data/NewsEmp2023/WASSA23_essay_level_with_labels_train_with_LLM.tsv"]
+train_file_list: ["data/NewsEmp2022/messages_train_ready_for_WS_with_LLM.tsv", "./data/NewsEmp2023/WASSA23_essay_level_with_labels_train_with_LLM.tsv"]
 
 ### for 2022 and 2023, we have separate gold standard files
 
 ############ 2022 ############
-train_file_list: ["data/NewsEmp2022/messages_train_ready_for_WS_with_LLM.tsv"]
-val_file_list: ["data/NewsEmp2022/messages_dev_features_ready_for_WS_2022.tsv"]
-val_goldstandard_file: data/NewsEmp2022/goldstandard_dev_2022.tsv
+# train_file_list: ["data/NewsEmp2022/messages_train_ready_for_WS_with_LLM.tsv"]
+# val_file_list: ["data/NewsEmp2022/messages_dev_features_ready_for_WS_2022.tsv"]
+# val_goldstandard_file: data/NewsEmp2022/goldstandard_dev_2022.tsv
 
 ############ 2023 ############
 # train_file_list: ["./data/NewsEmp2023/WASSA23_essay_level_with_labels_train_with_LLM.tsv"]
-# val_file_list: ["data/NewsEmp2023/WASSA23_essay_level_dev.tsv"]
-# val_goldstandard_file: data/NewsEmp2023/goldstandard_dev.tsv
+val_file_list: ["data/NewsEmp2023/WASSA23_essay_level_dev.tsv"]
+val_goldstandard_file: data/NewsEmp2023/goldstandard_dev.tsv

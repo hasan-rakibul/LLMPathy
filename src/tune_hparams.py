@@ -24,7 +24,7 @@ def objective(trial: optuna.trial.Trial, config) -> float:
 
     # things to tune
     config.noise_level = trial.suggest_float("noise_level", 0.0, 1.0)
-    config.num_agents = trial.suggest_int("num_agents", 1, 5)
+    config.num_agents = trial.suggest_int("num_agents", 2, 5)
 
     L.seed_everything(config.seed)
 
@@ -63,10 +63,11 @@ if __name__ == "__main__":
 
     config = OmegaConf.load("config/config_hparam_tuner.yaml")
 
-    if config.resume_optuna_dir:
+    try:
         storage = f"sqlite:///{config.resume_optuna_dir}/optuna.db"
+        log_info(logger, f"Resuming from {config.resume_optuna_dir}")
         config.logging_dir = config.resume_optuna_dir
-    else:
+    except:
         config.logging_dir=os.path.join(
             config.logging_dir, 
             datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + config.expt_name

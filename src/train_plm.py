@@ -26,6 +26,16 @@ def train_vanilla_plm(config, train_dl=None):
             # model created here directly goes to GPU
             model = LightningPLM(config)
 
+        if config.lr_find:
+            # https://lightning.ai/docs/pytorch/stable/advanced/training_tricks.html
+            tuner = L.pytorch.tuner.Tuner(trainer)
+            lr_finder = tuner.lr_find(model=model, train_dataloaders=train_dl, val_dataloaders=val_dl)
+            fig = lr_finder.plot(suggest=True)
+            fig.savefig(os.path.join(config.logging_dir, "lr_finder.png"))
+            log_info(logger, f"lr_finder plot saved at {config.logging_dir}/lr_finder.png")
+            config.lr = lr_finder.suggestion() # update config
+            model.learning_rate = lr_finder.suggestion() # update model
+
         if config.load_from_checkpoint:
             trainer.fit(
                 model=model,
@@ -61,7 +71,10 @@ def train_vanilla_plm(config, train_dl=None):
 
 if __name__ == "__main__":
     transformers.logging.set_verbosity_error()
-    config = OmegaConf.load("config/config_train.yaml")
+    config_train = OmegaConf.load("config/config_train.yaml")
+    config_common = OmegaConf.load("config/config_common.yaml")
+
+    config = OmegaConf.merge(config_common, config_train)
 
     L.seed_everything(config.seed)
 

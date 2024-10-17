@@ -24,10 +24,10 @@ def get_trainer(config, devices="auto", extra_callbacks=None, enable_checkpointi
     # early stopping callback is always there
     callbacks = [
         EarlyStopping(
-            monitor="val_ccc",
-            patience=5,
-            mode="max",
-            min_delta=0.0001
+            monitor="val_loss",
+            patience=3,
+            mode="min",
+            min_delta=0.01
         )
     ]
     
@@ -44,7 +44,7 @@ def get_trainer(config, devices="auto", extra_callbacks=None, enable_checkpointi
     callbacks.extend(extra_callbacks) if extra_callbacks else None
 
     trainer = L.Trainer(
-        max_epochs=config.num_epochs,
+        max_epochs=1 if config.debug_mode else config.num_epochs,
         default_root_dir=config.logging_dir,
         deterministic=True,
         logger=True,
@@ -61,7 +61,8 @@ def get_trainer(config, devices="auto", extra_callbacks=None, enable_checkpointi
 def resolve_logging_dir(config):
     if config.load_from_checkpoint:
         assert os.path.exists(config.load_from_checkpoint), "checkpoint_dir does not exist"
-        logging_dir = config.load_from_checkpoint   
+        path_list = config.load_from_checkpoint.split("/")[:-4] # logs/.../ ; calculate from end as we may have ./logs/ or just logs/
+        logging_dir = os.path.join(*path_list)   
     else:
         logging_dir=os.path.join(
             config.logging_dir, 

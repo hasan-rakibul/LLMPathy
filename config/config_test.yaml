@@ -1,19 +1,11 @@
 ############ Used for most of the experiments ############
 
-seed: 0
-num_workers: 12
-plm: roberta-base
-batch_size: 16
-
-# extra_columns_to_keep: ["article_id"]
-extra_columns_to_keep: []
-max_length: 512
-demographics: []
-# demographics: ['gender', 'education', 'race', 'age', 'income']
-feature_to_tokenise: ["essay"]
+submission_ready: True
 
 # save_predictions_to_disk: True # True or False
-load_from_checkpoint: logs/20241003_113735_Agentic_Onlyv3/lightning_logs/version_16429209/checkpoints/epoch=3-step=196.ckpt
+load_from_checkpoint: logs/20241015_105623_ManualTune-Baseline-DemographicsEssayAugmented-TrainedWith2023And2022/lightning_logs/version_16745665/checkpoints/epoch=13-step=4620.ckpt
 
 ####### 2023 ########
-test_file_list: ["data/NewsEmp2023/WASSA23_essay_level_test.tsv"]
+# test_file_list: ["data/NewsEmp2023/WASSA23_essay_level_test.tsv"]
+
+test_file_list: ["data/ProcessedNewsEmp/WASSA23_essay_level_test_demographic-essay.tsv"]

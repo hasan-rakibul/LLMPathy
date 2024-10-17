@@ -22,12 +22,7 @@ def _calculate_error(model, train_dl):
     sample_ids_list = []
     with torch.no_grad():
         for batch in train_dl:
-            input_ids = batch["input_ids"].to(device)
-            attention_mask = batch["attention_mask"].to(device)
-            preds = model(
-                input_ids=input_ids,
-                attention_mask=attention_mask
-            )
+            preds = model(batch.to(device))
             preds = preds.cpu().numpy()
             labels = batch["labels"].cpu().numpy()
             error = (preds - labels) ** 2
@@ -52,7 +47,8 @@ def _find_noisy_samples_agentic(config, train_dl, val_dl):
         error, sample_id = _calculate_error(model, train_dl)
         error_df.loc[sample_id, f"error_{i}"] = error
         
-    threshold = error_df.quantile(q=config.noise_level)
+    threshold = error_df.quantile(q=(1-config.noise_level)) 
+    # 1-noise_level, as hc samples are below the threshold
     log_info(logger, f"Threshold:\n{threshold}")
 
     threshold_matrix = error_df < threshold # will be True if error < threshold for each sample
@@ -107,7 +103,10 @@ def _agentic_noise_removal(config):
 
 if __name__ == "__main__":
     transformers.logging.set_verbosity_error()
-    config = OmegaConf.load("config/config_agentic_noise_removal.yaml")
+    config_agentic = OmegaConf.load("config/config_agentic_noise_removal.yaml")
+    config_common = OmegaConf.load("config/config_common.yaml")
+    config = OmegaConf.merge(config_common, config_agentic)
+    
     config.load_from_checkpoint = False # no resume is supported
 
     config.logging_dir = resolve_logging_dir(config) # update customised logging_dir

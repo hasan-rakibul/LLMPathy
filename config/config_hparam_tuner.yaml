@@ -1,35 +1,19 @@
-resume_optuna_dir: logs/20241010_075602_Tune_OnlyAgentic_Only2022 # False or dir of optuna.db file
-expt_name: Tune_OnlyAgentic_Only2022 # NOT used if any resume_optuna_dir is provided
+resume_optuna_dir: logs/20241015_150714_Tune_OnlyAgentic_Only2022_Augm/ # Comment out or dir of optuna.db file
+expt_name: Tune_OnlyAgentic_Only2022_Augm # NOT used if any resume_optuna_dir is provided
 logging_dir: ./logs # NOT used if any resume_optuna_dir is provided
-n_optuna_trails: 20
+n_optuna_trails: 1
 
 objectives: ["val_pcc", "val_ccc", "val_rmse"]
 directions: ["maximize", "maximize", "minimize"]
 
 # noise_level, num_agents are to be tuned
 
-seed: 0
-num_workers: 12
-lr: 1.0e-5
-plm: roberta-base
-num_epochs: 10
-batch_size: 16
+debug_mode: False
 
 save_agentics_to_disk: False # True or False
 updated_train_dl_file: False
 
 save_predictions_to_disk: False # won't save during val
-
-label_column: empathy
-llm_column: llm_empathy
-feature_to_tokenise: ["essay"]
-extra_columns_to_keep: []
-# extra_columns_to_keep: ["article_id"]
-extra_columns_to_keep_train: ["llm_empathy"]
-
-max_length: 512
-demographics: []
-# demographics: ['gender', 'education', 'race', 'age', 'income']
 
 ####### 2023 #######
 # train_file_list: ["data/NewsEmp2022/messages_train_ready_for_WS_with_LLM.tsv", "./data/NewsEmp2023/WASSA23_essay_level_with_labels_train_with_LLM.tsv"]
@@ -40,6 +24,9 @@ demographics: []
 # val_goldstandard_file: data/NewsEmp2023/goldstandard_dev.tsv
 
 ####### 2022 #######
-train_file_list: ["data/NewsEmp2022/messages_train_ready_for_WS_with_LLM.tsv"]
-val_file_list: ["data/NewsEmp2022/messages_dev_features_ready_for_WS_2022.tsv"]
-val_goldstandard_file: data/NewsEmp2022/goldstandard_dev_2022.tsv
+# train_file_list: ["data/NewsEmp2022/messages_train_ready_for_WS_with_LLM.tsv"]
+# val_file_list: ["data/NewsEmp2022/messages_dev_features_ready_for_WS_2022.tsv"]
+# val_goldstandard_file: data/NewsEmp2022/goldstandard_dev_2022.tsv
+
+train_file_list: ["data/ProcessedNewsEmp/messages_train_ready_for_WS_2022_llm_augm.tsv"]
+val_file_list: ["data/ProcessedNewsEmp/messages_dev_features_ready_for_WS_2022_demographic-essay.tsv"]
