@@ -7,6 +7,8 @@ from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
 import matplotlib.pyplot as plt
 import scienceplots
 
+import pandas as pd
+
 from lightning.pytorch.utilities import rank_zero_only
 
 logging.basicConfig(
@@ -16,9 +18,27 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+def read_file(file_path: str) -> pd.DataFrame:
+    if file_path.endswith(".tsv"):
+        df = pd.read_csv(file_path, sep='\t', na_values="unknown") # some column includes "unknown"
+    elif file_path.endswith(".csv"):
+        # 2024 data is csv. The essay has commas, and placed inside double quotes
+        # Further, tt has \" inside the quoted text, for example, "I am a \"good\" person"
+        df = pd.read_csv(file_path, quotechar='"', escapechar="\\")
+
+        # "2024" has different column names
+        df = df.rename(columns={
+            "person_essay": "essay",
+            "person_empathy": "empathy"
+        })
+    else:
+        raise ValueError(f"File extension not supported: {file_path}")
+    return df
+
 def get_trainer(config, devices="auto", extra_callbacks=None, enable_checkpointing=True):
     """
-    By default, we have EarlyStopping and ModelCheckpoint callbacks.
+    By default, we have EarlyStopping.
+    ModelCheckpoint is enabled if enable_checkpointing is True.
     If you want to add more callbacks, pass them in extra_callbacks.
     """
     # early stopping callback is always there
@@ -30,21 +50,23 @@ def get_trainer(config, devices="auto", extra_callbacks=None, enable_checkpointi
             min_delta=0.01
         )
     ]
+    callbacks = [] # remove early stopping for now
+    log_info(logger, "Early stopping disabled")
     
     if enable_checkpointing:
         # have a ModelCheckpoint callback
         callbacks.append(
             ModelCheckpoint(
-                monitor="val_loss",
+                monitor="val_pcc",
                 save_top_k=1,
-                mode="min"
+                mode="max"
             )
         )
     
     callbacks.extend(extra_callbacks) if extra_callbacks else None
 
     trainer = L.Trainer(
-        max_epochs=1 if config.debug_mode else config.num_epochs,
+        max_epochs=1 if "--debug_mode" in config else config.num_epochs,
         default_root_dir=config.logging_dir,
         deterministic=True,
         logger=True,
@@ -52,14 +74,13 @@ def get_trainer(config, devices="auto", extra_callbacks=None, enable_checkpointi
         callbacks=callbacks,
         devices=devices,
         enable_checkpointing=enable_checkpointing,
-        limit_train_batches=0.1 if config.debug_mode else 1.0,
-        limit_val_batches=0.1 if config.debug_mode else 1.0,
+        limit_train_batches=0.1 if "--debug_mode" in config else 1.0,
     )
 
     return trainer
 
 def resolve_logging_dir(config):
-    if config.load_from_checkpoint:
+    if "load_from_checkpoint" in config:
         assert os.path.exists(config.load_from_checkpoint), "checkpoint_dir does not exist"
         path_list = config.load_from_checkpoint.split("/")[:-4] # logs/.../ ; calculate from end as we may have ./logs/ or just logs/
         logging_dir = os.path.join(*path_list)   

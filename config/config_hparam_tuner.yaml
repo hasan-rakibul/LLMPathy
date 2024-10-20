@@ -1,24 +1,27 @@
-resume_optuna_dir: logs/20241015_150714_Tune_OnlyAgentic_Only2022_Augm/ # Comment out or dir of optuna.db file
-expt_name: Tune_OnlyAgentic_Only2022_Augm # NOT used if any resume_optuna_dir is provided
+# resume_optuna_dir: logs/20241015_150714_Tune_OnlyAgentic_Only2022_Augm/ # Comment out or dir of optuna.db file
+expt_name: Tune-LLM-GEm
+# expt_name: Tune_OnlyAgentic_Only2022_Augm # NOT used if any resume_optuna_dir is provided
 logging_dir: ./logs # NOT used if any resume_optuna_dir is provided
-n_optuna_trails: 1
+n_optuna_trails: 100
 
-objectives: ["val_pcc", "val_ccc", "val_rmse"]
-directions: ["maximize", "maximize", "minimize"]
+# objectives: ["val_pcc", "val_ccc", "val_rmse"]
+# directions: ["maximize", "maximize", "minimize"]
 
-# noise_level, num_agents are to be tuned
+objectives: ["val_pcc"]
+directions: ["maximize"]
 
-debug_mode: False
+# boolean flags. No need to provide values
+# --debug_mode: 
 
 save_agentics_to_disk: False # True or False
 updated_train_dl_file: False
 
 save_predictions_to_disk: False # won't save during val
 
-####### 2023 #######
 # train_file_list: ["data/NewsEmp2022/messages_train_ready_for_WS_with_LLM.tsv", "./data/NewsEmp2023/WASSA23_essay_level_with_labels_train_with_LLM.tsv"]
-# train_file_list: ["./data/NewsEmp2023/WASSA23_essay_level_with_labels_train_with_LLM.tsv"]
 
+####### 2023 #######
+# train_file_list: ["./data/NewsEmp2023/WASSA23_essay_level_with_labels_train_with_LLM.tsv"]
 # val_file_list: ["data/NewsEmp2023/WASSA23_essay_level_dev.tsv"]
 # for 2022 and 2023, we have separate gold standard files
 # val_goldstandard_file: data/NewsEmp2023/goldstandard_dev.tsv
@@ -28,5 +31,8 @@ save_predictions_to_disk: False # won't save during val
 # val_file_list: ["data/NewsEmp2022/messages_dev_features_ready_for_WS_2022.tsv"]
 # val_goldstandard_file: data/NewsEmp2022/goldstandard_dev_2022.tsv
 
-train_file_list: ["data/ProcessedNewsEmp/messages_train_ready_for_WS_2022_llm_augm.tsv"]
-val_file_list: ["data/ProcessedNewsEmp/messages_dev_features_ready_for_WS_2022_demographic-essay.tsv"]
+# train_file_list: ["data/ProcessedNewsEmp/messages_train_ready_for_WS_2022_llm_augm.tsv"]
+# val_file_list: ["data/ProcessedNewsEmp/messages_dev_features_ready_for_WS_2022_demographic-essay.tsv"]
+
+train_file_list: ["data/NewsEmp2024/trac3_EMP_train_llm.tsv"]
+val_file_list: ["data/NewsEmp2024/trac3_EMP_dev.csv"]

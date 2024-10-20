@@ -3,7 +3,7 @@ from groq import Groq
 from typing import Dict, List
 import numpy as np
 import pandas as pd
-from utils import log_info, log_debug
+from utils import log_info, log_debug, read_file
 from tenacity import retry, stop_after_attempt, wait_exponential
 import logging
 import argparse
@@ -25,12 +25,12 @@ def as_assistant(content: str) -> Dict:
 
 def as_user(essay: str) -> Dict:
     content = f"Essay: ```{essay}\n```\
-        Now, provide scores with respect to Batson's empathy scale.\
-        That is, provide scores between 1.0 and 7.0 for each of the following emotions: sympathetic, moved, compassionate, tender, warm, softhearted.\
-        Note that 1 == not feeling the emotion at all, and 7 == extremely feeling the emotion."
+        Now, provide scores with respect to Batson's empathy scale. That is, provide scores between 1.0 and 7.0 for each of the following emotions: sympathetic, moved, compassionate, tender, warm and softhearted.\
+        You must provide comma-separated floating point scores, where a score of 1.0 means the individual is not feeling the emotion at all, and a score of 7.0 means the individual is extremely feeling the emotion.\
+        You must not provide any other outputs apart from the scores."
     return {"role": "user", "content": content}
 
-@retry(wait=wait_exponential(multiplier=10, min=20, max=100), stop=stop_after_attempt(5))
+@retry(wait=wait_exponential(multiplier=10, min=40, max=100), stop=stop_after_attempt(5))
 def chat_completion(
     messages: List[Dict],
     model: str = "llama3-70b-8192",
@@ -55,10 +55,8 @@ def _perse_scores(subscale_scores: str) -> float:
 def completion(question: Dict) -> str:
     system = as_system(
         "Your task is to measure the empathy of individuals based on their written essays.\
-        You will assess empathy using Batson's definition, which specifically measures how the subject is feeling each of the following six emotions: sympathetic, moved, compassionate, tender, warm, and softhearted.\
-        Human subjects wrote the essays after reading a newspaper article involving harm to individuals, groups of people, nature, etc. The essay is provided to you within triple backticks.\
-        For each emotion, you must provide comma-separated scores, each between 1.0 and 7.0, where a score of 1 means the individual is not feeling the emotion at all, and a score of 7 means the individual is extremely feeling the emotion.\
-        You must not provide any other content than the scores."
+        You will assess empathy using Batson's definition, which specifically measures how the subject is feeling each of the following six emotions: sympathetic, moved, compassionate, tender, warm and softhearted.\
+        Human subjects wrote these essays after reading a newspaper article involving harm to individuals, groups of people, nature, etc. The essay is provided to you within triple backticks."
     )
 
     prompt = [system]
@@ -72,7 +70,7 @@ def completion(question: Dict) -> str:
     return subscale_scores
 
 def _measure_empathy_LLM(file_path:str) -> None:
-    df = pd.read_csv(file_path, sep="\t")
+    df = read_file(file_path)
     assert df["essay"].isnull().sum() == 0, "There are missing essay in the dataset"
     assert df["essay"].isna().sum() == 0, "There are NA essay in the dataset"
 
@@ -82,7 +80,10 @@ def _measure_empathy_LLM(file_path:str) -> None:
         save_path = file_path # overwrite the file in resume mode
     else:
         resume = False
-        save_path = file_path.replace(".tsv", "_llm.tsv")
+        if file_path.endswith(".tsv"):
+            save_path = file_path.replace(".tsv", "_llm.tsv")
+        elif file_path.endswith(".csv"):
+            save_path = file_path.replace(".csv", "_llm.tsv")
 
     for index, row in df.iterrows():
         # skip if already done
@@ -98,7 +99,7 @@ def _measure_empathy_LLM(file_path:str) -> None:
         try:
             empathy_score = _perse_scores(probably_subscale_scores)
         except:
-            log_info(logger, f"Failed to parse scores for index: {index} and essay: {row["essay"]["50"]}")
+            log_info(logger, f"Failed to parse scores for index: {index} and essay: {row["essay"][:50]}")
             log_info(logger, f"The failed scores: {probably_subscale_scores}")
             log_info(logger, f"Trying again for the above essay...")
 
@@ -110,7 +111,7 @@ def _measure_empathy_LLM(file_path:str) -> None:
             try:
                 empathy_score = _perse_scores(probably_subscale_scores)
             except:
-                log_info(logger, f"Failed to parse scores for index: {index} and essay: {row["essay"]["50"]}")
+                log_info(logger, f"Failed to parse scores for index: {index} and essay: {row["essay"][:50]}")
                 log_info(logger, f"The failed scores: {probably_subscale_scores}")
                 log_info(logger, f"Failed again. So, skipping this essay.")
                 empathy_score = np.nan

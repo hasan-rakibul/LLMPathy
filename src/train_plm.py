@@ -20,7 +20,11 @@ def train_vanilla_plm(config, train_dl=None):
         trainer = get_trainer(config)
         if train_dl is None:
             train_dl = datamodule.get_train_dl(data_path_list=config.train_file_list)
-    
+
+        if config.lr_scheduler_type == "linear":
+            # number of training steps is required for linear scheduler
+            config.num_training_steps = len(train_dl) * config.num_epochs
+
         # https://lightning.ai/docs/pytorch/stable/advanced/model_init.html
         with trainer.init_module():
             # model created here directly goes to GPU
@@ -36,7 +40,7 @@ def train_vanilla_plm(config, train_dl=None):
             config.lr = lr_finder.suggestion() # update config
             model.learning_rate = lr_finder.suggestion() # update model
 
-        if config.load_from_checkpoint:
+        if "load_from_checkpoint" in config:
             trainer.fit(
                 model=model,
                 train_dataloaders=train_dl,
@@ -68,6 +72,8 @@ def train_vanilla_plm(config, train_dl=None):
     model.config.save_predictions_to_disk = True # save final predictions to disk
     trainer.validate(model=model, dataloaders=val_dl)
 
+    return best_model_ckpt
+
 
 if __name__ == "__main__":
     transformers.logging.set_verbosity_error()
@@ -77,19 +83,27 @@ if __name__ == "__main__":
     config = OmegaConf.merge(config_common, config_train)
 
     L.seed_everything(config.seed)
-
-    if config.debug_mode:
-        # delete the logs
-        config.logging_dir = "./tmp"
-        log_info(logger, "Debug mode is on. Using {config.logging_dir} for storing log files.")
     
-    if config.updated_train_dl_file:
+    if "updated_train_dl_file" in config:
         train_dl = torch.load(config.updated_train_dl_file, weights_only=False)
         log_info(logger, f"Loaded updated train_dl from {config.updated_train_dl_file}")
         log_info(logger, f"Total number of training samples: {len(train_dl.dataset)}")
         config.logging_dir = os.path.dirname(config.updated_train_dl_file)
-        train_vanilla_plm(config, train_dl)
+        _ = train_vanilla_plm(config, train_dl)
     else:
+        if "--debug_mode" in config:
+            logger.setLevel(logging.DEBUG)
+            # delete the logs
+            config.logging_dir = "./tmp"
+            log_info(logger, f"Debug mode is on. Using {config.logging_dir} for storing log files.")
+        
         config.logging_dir = resolve_logging_dir(config) # update customised logging_dir
-        train_vanilla_plm(config)
+        best_model_ckpt = train_vanilla_plm(config)
+
+        from test import _test
+        config_test = OmegaConf.load("config/config_test.yaml")
+        config = OmegaConf.merge(config_common, config_test)
+        config.load_from_checkpoint = best_model_ckpt
+        config.logging_dir = config.logging_dir
+        _test(config)
         

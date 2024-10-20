@@ -16,6 +16,7 @@ src/archived/
 
 req_resources.sh
 .make_env_ready.sh
+.declare_api_key.sh
 
 # slurm output files
 *.out

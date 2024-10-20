@@ -1,4 +1,5 @@
-debug_mode: False
+# boolean flags. No need to provide values
+--debug_mode:
 
 expt_name: Agentic-2022-2023-EssayDn
 

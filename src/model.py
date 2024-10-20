@@ -1,4 +1,4 @@
-from transformers import AutoModelForSequenceClassification
+from transformers import AutoModelForSequenceClassification, get_linear_schedule_with_warmup
 import torch
 import lightning as L
 from lightning.pytorch.utilities import rank_zero_only
@@ -13,9 +13,9 @@ from utils import log_info
 logger = logging.getLogger(__name__)
 
 # taken and modified from our LLM-GEm work
-class RobertaRegressor(nn.Module):
+class RoBERTaFusionFC(nn.Module):
     def __init__(self, config):
-        super(RobertaRegressor, self).__init__()
+        super().__init__()
 
         self.config = config
         fc_arch = self.config.fc_arch
@@ -77,9 +77,16 @@ class LightningPLM(L.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         self.config = config
-        self.learning_rate = self.config.lr
+        self.learning_rate = self.config.lr # separate for lr tuning by lightning
 
-        self.model = RobertaRegressor(self.config)
+        if "fc_arch" in self.config:
+            raise NotImplementedError("FusionFC is forward is commented out")
+            self.model = RoBERTaFusionFC(self.config)
+        else:
+            self.model = AutoModelForSequenceClassification.from_pretrained(
+                pretrained_model_name_or_path=self.config.plm,
+                num_labels=1
+            )
 
         self.training_step_outputs = []
         self.training_step_labels = []
@@ -90,37 +97,54 @@ class LightningPLM(L.LightningModule):
         self.pcc = PearsonCorrCoef()
         self.ccc = ConcordanceCorrCoef()
         self.rmse = MeanSquaredError(squared=False) # root mean squared error
+    
+    # def forward_roberta_fusion_fc(self, batch):
+    #     if len(self.config.demographics) > 0:
+    #         demographic_vector = torch.cat(
+    #             [batch[col].unsqueeze(1) for col in self.config.demographics], dim=1
+    #         ) # shape: (batch_size, num_demographics)
+    #     else:
+    #         demographic_vector = None
+            
+    #     return self.model(
+    #         input_ids=batch['input_ids'],
+    #         attention_mask=batch['attention_mask'],
+    #         demographic_vector=demographic_vector
+    #     )
 
     def forward(self, batch):
-        if len(self.config.demographics) > 0:
-            demographic_vector = torch.cat(
-                [batch[col].unsqueeze(1) for col in self.config.demographics], dim=1
-            ) # shape: (batch_size, num_demographics)
-        else:
-            demographic_vector = None
-            
-        return self.model(
+        output = self.model(
             input_ids=batch['input_ids'],
-            attention_mask=batch['attention_mask'],
-            demographic_vector=demographic_vector
-        )            
+            attention_mask=batch['attention_mask']
+        )
+        return output.logits.squeeze(-1) # remove the last dimension
 
     def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(
+        optimiser = torch.optim.AdamW(
             self.model.parameters(),
             lr=self.learning_rate,
-            betas=(0.9, 0.98),
-            eps=1e-06,
-            weight_decay=0.1
+            betas=(self.config.adamw_beta1, self.config.adamw_beta2),
+            eps=self.config.adamw_eps,
+            weight_decay=self.config.adamw_weight_decay
         )
-        lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer,
-            mode='min',
-            patience=1,
-            threshold=0.001
-        )
+
+        if self.config.lr_scheduler_type == "plateau":
+            lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                optimiser,
+                mode='min',
+                patience=self.config.plateau_patience,
+                factor=self.config.plateau_factor,
+                threshold=self.config.plateau_threshold
+            )
+        elif self.config.lr_scheduler_type == "linear":
+            num_training_step = self.config.num_training_steps
+            lr_scheduler = get_linear_schedule_with_warmup(
+                optimiser,
+                num_warmup_steps=self.config.linear_warmup*num_training_step,
+                num_training_steps=num_training_step
+            )
         return {
-            'optimizer': optimizer,
+            'optimizer': optimiser,
             'lr_scheduler': {
                 'scheduler': lr_scheduler,
                 'monitor': 'val_loss',
@@ -159,8 +183,17 @@ class LightningPLM(L.LightningModule):
                 f.write(f"CCC: {ccc_score}\n")
                 f.write(f"RMSE: {rmse_score}\n")
 
+    def _label_fix(self, labels, llm_empathy):
+        condition = torch.abs(labels.detach() - llm_empathy.detach()) > self.config.alpha
+        labels[condition] = llm_empathy[condition]
+        return labels
+    
     def training_step(self, batch, batch_idx):
         outputs = self(batch)
+
+        if "alpha" in self.config:
+            batch["labels"] = self._label_fix(batch["labels"], batch["llm_empathy"])
+
         loss = torch.nn.functional.mse_loss(outputs, batch['labels'])
         self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
         
@@ -255,5 +288,3 @@ class LightningPLM(L.LightningModule):
 
         self.test_step_outputs.clear()
         self.test_step_labels.clear()
-    
-    

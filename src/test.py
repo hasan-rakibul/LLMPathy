@@ -24,7 +24,11 @@ def _test(config):
     )
     with trainer.init_module(empty_init=True):
         model = LightningPLM.load_from_checkpoint(config.load_from_checkpoint)
-    test_dl = datamodule.get_test_dl(data_path_list=config.test_file_list)
+    
+    if "2024" in config.test_file_list[0]:
+        test_dl = datamodule.get_test_dl(data_path_list=config.test_file_list, have_label=True)
+    else:
+        test_dl = datamodule.get_test_dl(data_path_list=config.test_file_list)
     
     # modified setting from config do not work because we are loading a checkpoint with this value being False
     model.config.save_predictions_to_disk = True
@@ -45,5 +49,5 @@ if __name__ == "__main__":
 
     _test(config)
 
-    if config.submission_ready:
+    if "--submission_ready" in config:
         _submission_ready(config)

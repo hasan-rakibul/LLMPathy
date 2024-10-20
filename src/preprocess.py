@@ -10,7 +10,7 @@ from datasets import Dataset
 import logging
 from sklearn.preprocessing import MinMaxScaler
 
-from utils import log_info
+from utils import log_info, read_file
 
 logger = logging.getLogger(__name__)
 
@@ -29,12 +29,9 @@ class DataModuleFromRaw:
     
     def _raw_to_processed(self, path, have_label, val):
         log_info(logger, f"\nReading data from {path}")
-        data = pd.read_csv(path, sep='\t', na_values="unknown") # some column includes "unknown"
+        data = read_file(path)
+        
         log_info(logger, f"Read {len(data)} samples from {path}")
-
-        # "2024" has different column names
-        if "2024" in path:
-            raise NotImplementedError("2024 data is not supported yet.")
 
         # keep revent columns only
         columns_to_keep = self.config.feature_to_tokenise + \
@@ -42,7 +39,7 @@ class DataModuleFromRaw:
 
         # if it is val of 2022 and 2023, the labels are separate files
         if val:
-            try:
+            if "val_goldstandard_file" in self.config:
                 goldstandard = pd.read_csv(
                     self.config.val_goldstandard_file, 
                     sep='\t',
@@ -51,7 +48,7 @@ class DataModuleFromRaw:
                 # first column is empathy
                 goldstandard = goldstandard.rename(columns={0: self.config.label_column})
                 data = pd.concat([data, goldstandard], axis=1)
-            except:
+            else:
                 log_info(logger, "No goldstandard file is read. Assuming it is not required.")
 
         if have_label:
@@ -61,9 +58,12 @@ class DataModuleFromRaw:
         
         selected_data = data[columns_to_keep]
 
-        if len(self.config.demographics) > 0:
-            numeric_data = data[self.config.demographics]
+        if "demographics" in self.config or "demographics_2024" in self.config:
+            if "2024" in path:
+                self.config.demographics = self.config.demographics_2024
+            
             scaler = MinMaxScaler()
+            numeric_data = data[self.config.demographics]
             numeric_data = pd.DataFrame(
                 scaler.fit_transform(numeric_data),
                 columns=self.config.demographics
@@ -103,8 +103,11 @@ class DataModuleFromRaw:
                 all_data = pd.concat([all_data, data])
             else:
                 all_data = data
-
+        
         log_info(logger, f"Total number of samples: {len(all_data)}\n")
+
+        # all_data.to_csv("tmp/all_data.tsv", sep='\t', index=False) # save the data for debugging
+        # import pdb; pdb.set_trace()
         
         # add sample_id column
         all_data['sample_id'] = range(len(all_data))     
@@ -150,6 +153,6 @@ class DataModuleFromRaw:
         # depending on data_name, the labels can be in different file
         return self._get_dl(data_path_list, have_label=True, shuffle=False, val=True)
     
-    def get_test_dl(self, data_path_list):
-        return self._get_dl(data_path_list, have_label=False, shuffle=False) # we don't have labels
+    def get_test_dl(self, data_path_list, have_label=False):
+        return self._get_dl(data_path_list, have_label=have_label, shuffle=False) # we have labels in 2024 data
     
