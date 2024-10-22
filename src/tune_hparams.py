@@ -167,7 +167,7 @@ if __name__ == "__main__":
 
     # objective_param = partial(objective_agentic, config=config)
     objective_param = partial(objective_llm_gem, config=config)
-    study.optimize(objective_param, n_trials=config.n_optuna_trails, show_progress_bar=True)
+    study.optimize(objective_param, n_trials=config.n_optuna_trails, show_progress_bar=False)
 
     trial_results = study.trials_dataframe()
     trial_results.to_csv(os.path.join(config.logging_dir, "trials_results.csv"))

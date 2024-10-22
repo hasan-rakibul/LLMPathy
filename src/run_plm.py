@@ -89,7 +89,7 @@ if __name__ == "__main__":
         log_info(logger, f"Loaded updated train_dl from {config.updated_train_dl_file}")
         log_info(logger, f"Total number of training samples: {len(train_dl.dataset)}")
         config.logging_dir = os.path.dirname(config.updated_train_dl_file)
-        _ = train_vanilla_plm(config, train_dl)
+        best_model_ckpt = train_vanilla_plm(config, train_dl)
     else:
         if "--debug_mode" in config:
             logger.setLevel(logging.DEBUG)
@@ -100,10 +100,10 @@ if __name__ == "__main__":
         config.logging_dir = resolve_logging_dir(config) # update customised logging_dir
         best_model_ckpt = train_vanilla_plm(config)
 
+    if "--do_test" in config:
         from test import _test
         config_test = OmegaConf.load("config/config_test.yaml")
         config = OmegaConf.merge(config_common, config_test)
         config.load_from_checkpoint = best_model_ckpt
-        config.logging_dir = config.logging_dir
+        config.logging_dir = resolve_logging_dir(config)
         _test(config)
-        

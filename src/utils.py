@@ -22,7 +22,7 @@ def read_file(file_path: str) -> pd.DataFrame:
     if file_path.endswith(".tsv"):
         df = pd.read_csv(file_path, sep='\t', na_values="unknown") # some column includes "unknown"
     elif file_path.endswith(".csv"):
-        # 2024 data is csv. The essay has commas, and placed inside double quotes
+        # 2024 raw data are in csv. The essay has commas, and placed inside double quotes
         # Further, tt has \" inside the quoted text, for example, "I am a \"good\" person"
         df = pd.read_csv(file_path, quotechar='"', escapechar="\\")
 

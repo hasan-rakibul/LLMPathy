@@ -3,7 +3,7 @@
 #SBATCH --job-name=TUNE-HPARAMS
 #SBATCH --time=24:00:00
 #SBATCH --nodes=1
-#SBATCH --partition=gpu
+#SBATCH --partition=gpu-highmem
 #SBATCH --gres=gpu:1
 #SBATCH --account=pawsey1001-gpu
 

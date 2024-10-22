@@ -2,9 +2,10 @@
 
 
 # boolean flags. No need to provide values
---debug_mode:
+# --debug_mode: # will run only 1 epoch of training with 1% of training data, saves logs in tmp/ directory
+--do_test: # will run test immediately after training
 
-expt_name: ReproduceWASSA2024Paper30Epochs
+expt_name: Vanilla
 
 val_only: False
 
@@ -14,7 +15,7 @@ save_predictions_to_disk: False # so that we don't save all val steps each epoch
 
 # updated_train_dl_file: ./logs/20241017_124809_Agentic-2022-2023-EssayDn/updated_train_dl.pt
 
-train_file_list: ["data/NewsEmp2024/trac3_EMP_train.csv", "data/NewsEmp2022/messages_train_ready_for_WS.tsv", "./data/NewsEmp2023/WASSA23_essay_level_with_labels_train.tsv"]
+# train_file_list: ["data/NewsEmp2024/trac3_EMP_train.csv", "data/NewsEmp2022/messages_train_ready_for_WS.tsv", "./data/NewsEmp2023/WASSA23_essay_level_with_labels_train.tsv"]
 
 ############ 2022 and 2023 ############
 # train_file_list: ["data/NewsEmp2022/messages_train_ready_for_WS_with_LLM.tsv", "./data/NewsEmp2023/WASSA23_essay_level_with_labels_train_with_LLM.tsv"]
@@ -32,4 +33,5 @@ train_file_list: ["data/NewsEmp2024/trac3_EMP_train.csv", "data/NewsEmp2022/mess
 
 ############ 2024 ############
 # train_file_list: ["data/NewsEmp2024/trac3_EMP_train.csv"]
+train_file_list: ["data/NewsEmp2024/trac3_EMP_train_llm.tsv"]
 val_file_list: ["data/NewsEmp2024/trac3_EMP_dev.csv"]

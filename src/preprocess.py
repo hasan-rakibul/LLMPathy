@@ -27,7 +27,7 @@ class DataModuleFromRaw:
             
         self.data_collator = DataCollatorWithPadding(tokenizer=self.tokeniser)
     
-    def _raw_to_processed(self, path, have_label, val):
+    def _raw_to_processed(self, path: str, have_label: bool, mode: str):
         log_info(logger, f"\nReading data from {path}")
         data = read_file(path)
         
@@ -38,7 +38,7 @@ class DataModuleFromRaw:
             self.config.extra_columns_to_keep
 
         # if it is val of 2022 and 2023, the labels are separate files
-        if val:
+        if mode == "val":
             if "val_goldstandard_file" in self.config:
                 goldstandard = pd.read_csv(
                     self.config.val_goldstandard_file, 
@@ -53,7 +53,7 @@ class DataModuleFromRaw:
 
         if have_label:
             columns_to_keep.append(self.config.label_column)
-            if not val: # means it is train
+            if mode == "train":
                 columns_to_keep.extend(self.config.extra_columns_to_keep_train) # this is a list
         
         selected_data = data[columns_to_keep]
@@ -95,10 +95,10 @@ class DataModuleFromRaw:
             max_length=self.config.max_length
         )
 
-    def get_hf_data(self, data_path_list, have_label, val):
+    def get_hf_data(self, data_path_list, have_label, mode):
         # we may combine the data from different versions
         for data_path in data_path_list:
-            data = self._raw_to_processed(data_path, have_label, val)
+            data = self._raw_to_processed(data_path, have_label, mode)
             if 'all_data' in locals():
                 all_data = pd.concat([all_data, data])
             else:
@@ -130,12 +130,12 @@ class DataModuleFromRaw:
         np.random.seed(worker_seed)
         random.seed(worker_seed) 
     
-    def _get_dl(self, data_path_list, have_label, shuffle, val=False):
+    def _get_dl(self, data_path_list, have_label, shuffle, mode):
         # making sure the shuffling is reproducible
         g = torch.Generator()
         g.manual_seed(self.config.seed)
 
-        hf_data = self.get_hf_data(data_path_list=data_path_list, have_label=have_label, val=val)
+        hf_data = self.get_hf_data(data_path_list=data_path_list, have_label=have_label, mode=mode)
         return DataLoader(
             hf_data,
             batch_size=self.config.batch_size, 
@@ -147,12 +147,12 @@ class DataModuleFromRaw:
             generator=g
         )
     def get_train_dl(self, data_path_list):
-        return self._get_dl(data_path_list, have_label=True, shuffle=True)
+        return self._get_dl(data_path_list, have_label=True, shuffle=True, mode="train")
     
     def get_val_dl(self, data_path_list):
         # depending on data_name, the labels can be in different file
-        return self._get_dl(data_path_list, have_label=True, shuffle=False, val=True)
+        return self._get_dl(data_path_list, have_label=True, shuffle=False, mode="val")
     
     def get_test_dl(self, data_path_list, have_label=False):
-        return self._get_dl(data_path_list, have_label=have_label, shuffle=False) # we have labels in 2024 data
+        return self._get_dl(data_path_list, have_label=have_label, shuffle=False, mode="test") # we have labels in 2024 data
     

@@ -1,8 +1,8 @@
-# resume_optuna_dir: logs/20241015_150714_Tune_OnlyAgentic_Only2022_Augm/ # Comment out or dir of optuna.db file
+resume_optuna_dir: logs/20241020_113604_Tune-LLM-GEm # Comment out or dir of optuna.db file
 expt_name: Tune-LLM-GEm
 # expt_name: Tune_OnlyAgentic_Only2022_Augm # NOT used if any resume_optuna_dir is provided
 logging_dir: ./logs # NOT used if any resume_optuna_dir is provided
-n_optuna_trails: 100
+n_optuna_trails: 300
 
 # objectives: ["val_pcc", "val_ccc", "val_rmse"]
 # directions: ["maximize", "maximize", "minimize"]
