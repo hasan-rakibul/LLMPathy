@@ -77,7 +77,6 @@ class DataModuleFromRaw:
         assert selected_data.isna().any().any() == False, "There are still NaN values in the data."
         assert selected_data.isnull().any().any() == False, "The are still null values in the data"
 
-       
         return selected_data.copy() # return a copy to avoid modifying the original data
 
     def _tokeniser_fn(self, sentence):
@@ -95,6 +94,20 @@ class DataModuleFromRaw:
             max_length=self.config.max_length
         )
 
+    def label_fix_inplace(self, data: pd.DataFrame) -> None:
+        """
+        Replace 'empathy' values with 'llm_empathy' if their difference exceeds the threshold 'alpha'.
+         
+        in place because pandas dataframes are mutable
+
+        """
+        # Calculate the absolute difference between 'empathy' and 'llm_empathy'
+        condition = np.abs(data['empathy'] - data['llm_empathy']) > self.config.alpha
+        
+        # Replace 'empathy' values where the condition is True
+        data.loc[condition, 'empathy'] = data.loc[condition, 'llm_empathy']
+        
+    
     def get_hf_data(self, data_path_list, have_label, mode):
         # we may combine the data from different versions
         for data_path in data_path_list:
@@ -108,6 +121,10 @@ class DataModuleFromRaw:
 
         # all_data.to_csv("tmp/all_data.tsv", sep='\t', index=False) # save the data for debugging
         # import pdb; pdb.set_trace()
+
+        if mode=="train" and "alpha" in self.config:
+            self.label_fix_inplace(all_data)
+            log_info(logger, f"Fixed the labels in the data.\n")
         
         # add sample_id column
         all_data['sample_id'] = range(len(all_data))     
@@ -122,6 +139,7 @@ class DataModuleFromRaw:
         if have_label:
             all_data_hf = all_data_hf.rename_column(self.config.label_column, 'labels')
         all_data_hf.set_format('torch')
+        
         return all_data_hf
     
     # taken from https://pytorch.org/docs/stable/notes/randomness.html

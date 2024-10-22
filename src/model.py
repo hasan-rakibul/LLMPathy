@@ -183,16 +183,8 @@ class LightningPLM(L.LightningModule):
                 f.write(f"CCC: {ccc_score}\n")
                 f.write(f"RMSE: {rmse_score}\n")
 
-    def _label_fix(self, labels, llm_empathy):
-        condition = torch.abs(labels.detach() - llm_empathy.detach()) > self.config.alpha
-        labels[condition] = llm_empathy[condition]
-        return labels
-    
     def training_step(self, batch, batch_idx):
         outputs = self(batch)
-
-        if "alpha" in self.config:
-            batch["labels"] = self._label_fix(batch["labels"], batch["llm_empathy"])
 
         loss = torch.nn.functional.mse_loss(outputs, batch['labels'])
         self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
