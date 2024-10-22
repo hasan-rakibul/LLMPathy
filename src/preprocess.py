@@ -10,7 +10,7 @@ from datasets import Dataset
 import logging
 from sklearn.preprocessing import MinMaxScaler
 
-from utils import log_info, read_file
+from utils import log_info, log_debug, read_file
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +26,24 @@ class DataModuleFromRaw:
         )
             
         self.data_collator = DataCollatorWithPadding(tokenizer=self.tokeniser)
+
+
+    def label_fix_inplace(self, data: pd.DataFrame) -> None:
+        """
+        Replace 'empathy' values with 'llm_empathy' if their difference exceeds the threshold 'alpha'.
+
+        in place because pandas dataframes are mutable
+
+        """
+        # Calculate the absolute difference between 'empathy' and 'llm_empathy'
+        condition = np.abs(data['empathy'] - data['llm_empathy']) > self.config.alpha
+        log_info(logger, f"Number of labels updated (crowdsourced labels --> LLM labels): {condition.sum()}")
+        log_debug(logger, f"Replacing at indices: {data[condition].index.tolist()}")
+
+        # Replace 'empathy' values where the condition is True
+        data.loc[condition, 'empathy'] = data.loc[condition, 'llm_empathy']
     
-    def _raw_to_processed(self, path: str, have_label: bool, mode: str):
+    def _raw_to_processed(self, path: str, have_label: bool, mode: str) -> pd.DataFrame:
         log_info(logger, f"\nReading data from {path}")
         data = read_file(path)
         
@@ -53,8 +69,9 @@ class DataModuleFromRaw:
 
         if have_label:
             columns_to_keep.append(self.config.label_column)
-            if mode == "train":
-                columns_to_keep.extend(self.config.extra_columns_to_keep_train) # this is a list
+        
+        if mode == "train" or mode == "train_only_LLM":
+            columns_to_keep.extend(self.config.extra_columns_to_keep_train) # this is a list
         
         selected_data = data[columns_to_keep]
 
@@ -77,7 +94,15 @@ class DataModuleFromRaw:
         assert selected_data.isna().any().any() == False, "There are still NaN values in the data."
         assert selected_data.isnull().any().any() == False, "The are still null values in the data"
 
-        return selected_data.copy() # return a copy to avoid modifying the original data
+        if mode == "train" and "alpha" in self.config:
+            log_info(logger, f"Updating labels of {path} file.\n")
+            self.label_fix_inplace(selected_data)
+
+        if mode == "train_only_LLM":
+            log_info(logger, f"Using only LLM labels of {path} file.\n")
+            selected_data = selected_data.rename(columns={'llm_empathy': self.config.label_column})
+
+        return selected_data
 
     def _tokeniser_fn(self, sentence):
         if len(self.config.feature_to_tokenise) == 1: # only one feature
@@ -94,20 +119,6 @@ class DataModuleFromRaw:
             max_length=self.config.max_length
         )
 
-    def label_fix_inplace(self, data: pd.DataFrame) -> None:
-        """
-        Replace 'empathy' values with 'llm_empathy' if their difference exceeds the threshold 'alpha'.
-         
-        in place because pandas dataframes are mutable
-
-        """
-        # Calculate the absolute difference between 'empathy' and 'llm_empathy'
-        condition = np.abs(data['empathy'] - data['llm_empathy']) > self.config.alpha
-        
-        # Replace 'empathy' values where the condition is True
-        data.loc[condition, 'empathy'] = data.loc[condition, 'llm_empathy']
-        
-    
     def get_hf_data(self, data_path_list, have_label, mode):
         # we may combine the data from different versions
         for data_path in data_path_list:
@@ -117,15 +128,17 @@ class DataModuleFromRaw:
             else:
                 all_data = data
         
-        log_info(logger, f"Total number of samples: {len(all_data)}\n")
+        if mode == "train":
+            # add the train_file_only_LLM_list
+            for data_path in self.config.train_file_only_LLM_list:
+                # assuming no have_label, as we are using LLM labels as the main labels
+                data = self._raw_to_processed(data_path, have_label=False, mode="train_only_LLM")
+                all_data = pd.concat([all_data, data])
+
+        log_info(logger, f"Total number of {mode} samples: {len(all_data)}\n")
 
         # all_data.to_csv("tmp/all_data.tsv", sep='\t', index=False) # save the data for debugging
-        # import pdb; pdb.set_trace()
 
-        if mode=="train" and "alpha" in self.config:
-            self.label_fix_inplace(all_data)
-            log_info(logger, f"Fixed the labels in the data.\n")
-        
         # add sample_id column
         all_data['sample_id'] = range(len(all_data))     
         all_data_hf = Dataset.from_pandas(all_data, preserve_index=False) # convert to huggingface dataset

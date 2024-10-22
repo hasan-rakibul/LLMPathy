@@ -2,8 +2,7 @@ from transformers import AutoModelForSequenceClassification, get_linear_schedule
 import torch
 import lightning as L
 from lightning.pytorch.utilities import rank_zero_only
-from torchmetrics.regression import PearsonCorrCoef, ConcordanceCorrCoef
-from torchmetrics import MeanSquaredError
+from torchmetrics.functional import pearson_corrcoef, concordance_corrcoef, mean_squared_error
 import os
 import logging
 import pandas as pd
@@ -94,9 +93,6 @@ class LightningPLM(L.LightningModule):
         self.validation_step_labels = []
         self.test_step_outputs = []
         self.test_step_labels = []
-        self.pcc = PearsonCorrCoef()
-        self.ccc = ConcordanceCorrCoef()
-        self.rmse = MeanSquaredError(squared=False) # root mean squared error
     
     # def forward_roberta_fusion_fc(self, batch):
     #     if len(self.config.demographics) > 0:
@@ -161,7 +157,7 @@ class LightningPLM(L.LightningModule):
     
     @rank_zero_only
     def _calc_save_predictions(self, preds, labels=None, mode='test'):
-        preds_np = preds.cpu().numpy()
+        preds_np = preds.numpy()
         
         pred_df = pd.DataFrame({'emp': preds_np, 'dis': preds_np}) # we're not predicting distress, just aligning with submission system
         pred_df.to_csv(
@@ -171,9 +167,9 @@ class LightningPLM(L.LightningModule):
         log_info(logger, f'Saved predictions to {self.config.logging_dir}/{mode}-predictions_EMP.tsv')
         
         if labels is not None:
-            pcc_score = self.pcc(preds, labels).item()
-            ccc_score = self.ccc(preds, labels).item()
-            rmse_score = self.rmse(preds, labels).item()
+            pcc_score = pearson_corrcoef(preds, labels).item()
+            ccc_score = concordance_corrcoef(preds, labels).item()
+            rmse_score = mean_squared_error(preds, labels, squared=False).item()
             pcc_score = round(pcc_score, 3)
             ccc_score = round(ccc_score, 3)
             rmse_score = round(rmse_score, 3)
@@ -197,23 +193,32 @@ class LightningPLM(L.LightningModule):
     def on_train_epoch_end(self):
         all_preds = torch.cat(self.training_step_outputs)
         all_labels = torch.cat(self.training_step_labels)
+
+        # float32 (default) has poorer performance in pcc and ccc
+        # metrics calculation in GPU widely varies from CPU
+        # also, class version of metrics widely varies from functional version
+        # functional version matched with scipy, numpy and WASSA organisers' evaluation
+            
+        all_preds = all_preds.to(torch.float64).cpu()
+        all_labels = all_labels.to(torch.float64).cpu()
+
         self.log(
             'train_pcc', 
-            self.pcc(all_preds, all_labels),
+            pearson_corrcoef(all_preds, all_labels),
             logger=True,
             prog_bar=True,
             sync_dist=True
         )
         self.log(
             'train_ccc',
-            self.ccc(all_preds, all_labels),
+            concordance_corrcoef(all_preds, all_labels),
             logger=True,
             prog_bar=True,
             sync_dist=True
         )
         self.log(
             'train_rmse',
-            self.rmse(all_preds, all_labels),
+            mean_squared_error(all_preds, all_labels, squared=False),
             logger=True,
             prog_bar=True,
             sync_dist=True
@@ -232,23 +237,27 @@ class LightningPLM(L.LightningModule):
     def on_validation_epoch_end(self):
         all_preds = torch.cat(self.validation_step_outputs)
         all_labels = torch.cat(self.validation_step_labels)
+
+        all_preds = all_preds.to(torch.float64).cpu()
+        all_labels = all_labels.to(torch.float64).cpu()
+
         self.log(
             'val_pcc',
-            self.pcc(all_preds, all_labels),
+            pearson_corrcoef(all_preds, all_labels),
             logger=True,
             prog_bar=True,
             sync_dist=True
         )
         self.log(
             'val_ccc',
-            self.ccc(all_preds, all_labels),
+            concordance_corrcoef(all_preds, all_labels),
             logger=True,
             prog_bar=True,
             sync_dist=True
         )
         self.log(
             'val_rmse',
-            self.rmse(all_preds, all_labels),
+            mean_squared_error(all_preds, all_labels, squared=False),
             logger=True,
             prog_bar=True,
             sync_dist=True
@@ -270,8 +279,12 @@ class LightningPLM(L.LightningModule):
     @rank_zero_only
     def on_test_epoch_end(self):
         all_preds = torch.cat(self.test_step_outputs)
+
+        all_preds = all_preds.to(torch.float64).cpu()
+
         if len(self.test_step_labels) > 0:
             all_labels = torch.cat(self.test_step_labels)
+            all_labels = all_labels.to(torch.float64).cpu()
         else:
             all_labels = None
 

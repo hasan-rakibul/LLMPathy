@@ -62,7 +62,7 @@ def objective_llm_gem(trial: optuna.trial.Trial, config) -> float:
     # things to tune
     config.num_epochs = trial.suggest_int("num_epochs", 2, 50)
     config.lr = trial.suggest_float("lr", 1e-7, 1e-2, log=True)
-    config.batch_size = trial.suggest_int("batch_size", 2, 32)
+    config.batch_size = trial.suggest_int("batch_size", 1, 32)
     config.max_length = trial.suggest_int("max_length", 128, 512, step=128)
     config.adamw_beta1 = trial.suggest_float("adamw_beta1", 0.8, 0.99)
     config.adamw_beta2 = trial.suggest_float("adamw_beta2", 0.8, 0.9999)

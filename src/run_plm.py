@@ -74,7 +74,6 @@ def train_vanilla_plm(config, train_dl=None):
 
     return best_model_ckpt
 
-
 if __name__ == "__main__":
     transformers.logging.set_verbosity_error()
     config_train = OmegaConf.load("config/config_train.yaml")

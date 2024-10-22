@@ -1,11 +1,9 @@
-############ NOT used if any load_from_checkpoint or updated_train_dl_file is provided #######
-
 
 # boolean flags. No need to provide values
 # --debug_mode: # will run only 1 epoch of training with 1% of training data, saves logs in tmp/ directory
 --do_test: # will run test immediately after training
 
-expt_name: Vanilla
+expt_name: Vanilla+OnlyLLM2023
 
 val_only: False
 
@@ -35,3 +33,5 @@ save_predictions_to_disk: False # so that we don't save all val steps each epoch
 # train_file_list: ["data/NewsEmp2024/trac3_EMP_train.csv"]
 train_file_list: ["data/NewsEmp2024/trac3_EMP_train_llm.tsv"]
 val_file_list: ["data/NewsEmp2024/trac3_EMP_dev.csv"]
+
+train_file_only_LLM_list: ["data/NewsEmp2023/WASSA23_essay_level_with_labels_train_with_LLM.tsv",]
