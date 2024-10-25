@@ -25,29 +25,47 @@ def train_vanilla_plm(config, train_dl=None):
             # number of training steps is required for linear scheduler
             config.num_training_steps = len(train_dl) * config.num_epochs
 
-        # https://lightning.ai/docs/pytorch/stable/advanced/model_init.html
-        with trainer.init_module():
-            # model created here directly goes to GPU
-            model = LightningPLM(config)
-
-        if config.lr_find:
-            # https://lightning.ai/docs/pytorch/stable/advanced/training_tricks.html
-            tuner = L.pytorch.tuner.Tuner(trainer)
-            lr_finder = tuner.lr_find(model=model, train_dataloaders=train_dl, val_dataloaders=val_dl)
-            fig = lr_finder.plot(suggest=True)
-            fig.savefig(os.path.join(config.logging_dir, "lr_finder.png"))
-            log_info(logger, f"lr_finder plot saved at {config.logging_dir}/lr_finder.png")
-            config.lr = lr_finder.suggestion() # update config
-            model.learning_rate = lr_finder.suggestion() # update model
-
+        # commented out as I moved the model initialisation in the later part
+        # if config.lr_find: # didn't work well in a casual run
+        #     # https://lightning.ai/docs/pytorch/stable/advanced/training_tricks.html
+        #     tuner = L.pytorch.tuner.Tuner(trainer)
+        #     lr_finder = tuner.lr_find(model=model, train_dataloaders=train_dl, val_dataloaders=val_dl)
+        #     fig = lr_finder.plot(suggest=True)
+        #     fig.savefig(os.path.join(config.logging_dir, "lr_finder.png"))
+        #     log_info(logger, f"lr_finder plot saved at {config.logging_dir}/lr_finder.png")
+        #     config.lr = lr_finder.suggestion() # update config
+        #     model.learning_rate = lr_finder.suggestion() # update model
         if "load_from_checkpoint" in config:
+            log_info(logger, f"Resuming training from {config.load_from_checkpoint}")
+            # https://lightning.ai/docs/pytorch/stable/advanced/model_init.html
+            with trainer.init_module():
+                # model created here directly goes to GPU
+                model = LightningPLM(config)
+
             trainer.fit(
                 model=model,
                 train_dataloaders=train_dl,
                 val_dataloaders=val_dl,
                 ckpt_path=config.load_from_checkpoint
             )
+        elif "finetune_from_checkpoint" in config:
+            log_info(logger, f"Fine-tuning from {config.finetune_from_checkpoint}")
+            assert "alpha" not in config, "alpha should not be provided for fine-tuning"
+            assert "train_file_only_LLM_list" not in config, "train_file_only_LLM_list should not be provided for fine-tuning"
+            with trainer.init_module(empty_init=True):
+                model = LightningPLM.load_from_checkpoint(config.finetune_from_checkpoint)
+            
+            trainer.fit(
+                model=model,
+                train_dataloaders=train_dl,
+                val_dataloaders=val_dl
+            )
         else:
+            log_info(logger, "Training from scratch")
+            # https://lightning.ai/docs/pytorch/stable/advanced/model_init.html
+            with trainer.init_module():
+                # model created here directly goes to GPU
+                model = LightningPLM(config)
             trainer.fit(
                 model=model,
                 train_dataloaders=train_dl,

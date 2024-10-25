@@ -1,0 +1,2 @@
+test_zero_shot_file: data/NewsEmp2022/messages_train_ready_for_WS_gpt.tsv
+# val_goldstandard_file: data/NewsEmp2022/goldstandard_dev_2022.tsv

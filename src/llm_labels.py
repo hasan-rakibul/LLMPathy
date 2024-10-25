@@ -2,14 +2,13 @@ import os
 from groq import Groq
 from typing import Dict, List
 import numpy as np
-import pandas as pd
 from utils import log_info, log_debug, read_file
 from tenacity import retry, stop_after_attempt, wait_exponential
 import logging
 import argparse
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 client = Groq(
     api_key=os.environ.get("GROQ_API_KEY"),
@@ -30,7 +29,7 @@ def as_user(essay: str) -> Dict:
         You must not provide any other outputs apart from the scores."
     return {"role": "user", "content": content}
 
-@retry(wait=wait_exponential(multiplier=10, min=40, max=100), stop=stop_after_attempt(5))
+@retry(wait=wait_exponential(multiplier=5, min=60, max=300), stop=stop_after_attempt(5))
 def chat_completion(
     messages: List[Dict],
     model: str = "llama3-70b-8192",
@@ -73,7 +72,6 @@ def _measure_empathy_LLM(file_path:str) -> None:
     df = read_file(file_path)
     assert df["essay"].isnull().sum() == 0, "There are missing essay in the dataset"
     assert df["essay"].isna().sum() == 0, "There are NA essay in the dataset"
-
     if "llm_empathy" in df.columns:
         log_info(logger, "llm_empathy exists in columns. So, in resume mode.")
         resume = True
@@ -81,9 +79,9 @@ def _measure_empathy_LLM(file_path:str) -> None:
     else:
         resume = False
         if file_path.endswith(".tsv"):
-            save_path = file_path.replace(".tsv", "_llm.tsv")
+            save_path = file_path.replace(".tsv", "_llama.tsv")
         elif file_path.endswith(".csv"):
-            save_path = file_path.replace(".csv", "_llm.tsv")
+            save_path = file_path.replace(".csv", "_llama.tsv")
 
     for index, row in df.iterrows():
         # skip if already done

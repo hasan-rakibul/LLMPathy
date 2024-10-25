@@ -174,10 +174,10 @@ class LightningPLM(L.LightningModule):
             ccc_score = round(ccc_score, 3)
             rmse_score = round(rmse_score, 3)
 
-            with open(os.path.join(self.config.logging_dir, f"{mode}-metrics.txt"), 'w') as f:
-                f.write(f"PCC: {pcc_score}\n")
-                f.write(f"CCC: {ccc_score}\n")
-                f.write(f"RMSE: {rmse_score}\n")
+            log_info(logger, f"PCC & CCC & RMSE: {pcc_score} & {ccc_score} & {rmse_score}")
+
+            with open(os.path.join(self.config.logging_dir, f"metrics.txt"), 'a') as f:
+                f.write(f"{mode} - PCC & CCC & RMSE: {pcc_score} & {ccc_score} & {rmse_score}\n")
 
     def training_step(self, batch, batch_idx):
         outputs = self(batch)

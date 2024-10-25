@@ -128,7 +128,7 @@ class DataModuleFromRaw:
             else:
                 all_data = data
         
-        if mode == "train":
+        if "train_file_only_LLM_list" in self.config and mode == "train":
             # add the train_file_only_LLM_list
             for data_path in self.config.train_file_only_LLM_list:
                 # assuming no have_label, as we are using LLM labels as the main labels

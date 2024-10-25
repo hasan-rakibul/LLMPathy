@@ -84,6 +84,12 @@ def resolve_logging_dir(config):
         assert os.path.exists(config.load_from_checkpoint), "checkpoint_dir does not exist"
         path_list = config.load_from_checkpoint.split("/")[:-4] # logs/.../ ; calculate from end as we may have ./logs/ or just logs/
         logging_dir = os.path.join(*path_list)   
+    elif "finetune_from_checkpoint" in config:
+        assert os.path.exists(config.finetune_from_checkpoint), "checkpoint_dir does not exist"
+        path_list = config.finetune_from_checkpoint.split("/")[:-4]
+        # add additional directory for finetuning
+        path_list.append("finetune")
+        logging_dir = os.path.join(*path_list)
     else:
         logging_dir=os.path.join(
             config.logging_dir, 
