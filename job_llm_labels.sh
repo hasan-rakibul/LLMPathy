@@ -1,7 +1,7 @@
 #!/bin/bash
  
 #SBATCH --job-name=LLM-Labels
-#SBATCH --time=24:00:00
+#SBATCH --time=12:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
@@ -10,4 +10,4 @@
 . .declare_api_key.sh
 
 python src/llm_labels.py \
---file_path=data/NewsEmp2022/messages_train_ready_for_WS_llama.tsv
+--file_path=data/NewsEmp2022/messages_dev_features_ready_for_WS_2022_llama.tsv

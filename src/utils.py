@@ -41,17 +41,22 @@ def get_trainer(config, devices="auto", extra_callbacks=None, enable_checkpointi
     ModelCheckpoint is enabled if enable_checkpointing is True.
     If you want to add more callbacks, pass them in extra_callbacks.
     """
-    # early stopping callback is always there
-    callbacks = [
-        EarlyStopping(
-            monitor="val_loss",
-            patience=3,
-            mode="min",
-            min_delta=0.01
-        )
-    ]
-    callbacks = [] # remove early stopping for now
-    log_info(logger, "Early stopping disabled")
+    early_stopping = EarlyStopping(
+        monitor="val_pcc",
+        patience=5,
+        mode="max",
+        min_delta=0.001
+    )
+    # early_stopping = EarlyStopping(
+    #     monitor="val_loss",
+    #     patience=3,
+    #     mode="min",
+    #     min_delta=0.01
+    # )
+    callbacks = []
+    
+    callbacks.append(early_stopping)
+    # log_info(logger, "Early stopping disabled")
     
     if enable_checkpointing:
         # have a ModelCheckpoint callback

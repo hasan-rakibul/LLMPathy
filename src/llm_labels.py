@@ -29,7 +29,7 @@ def as_user(essay: str) -> Dict:
         You must not provide any other outputs apart from the scores."
     return {"role": "user", "content": content}
 
-@retry(wait=wait_exponential(multiplier=5, min=60, max=300), stop=stop_after_attempt(5))
+@retry(wait=wait_exponential(multiplier=1, min=120, max=600), stop=stop_after_attempt(5))
 def chat_completion(
     messages: List[Dict],
     model: str = "llama3-70b-8192",

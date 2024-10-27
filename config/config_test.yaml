@@ -3,8 +3,7 @@
 # Boolean flags. No need to provide values 
 # --submission_ready:
 
-save_predictions_to_disk: True # True or False
-load_from_checkpoint: logs/20241021_113127_LLMGEm-2024/lightning_logs/version_16933099/checkpoints/epoch=16-step=8500.ckpt 
-
+save_predictions_to_disk: False # True or False
+load_from_checkpoint: logs/20241026_205612_SieBERT/lightning_logs/version_17661371/checkpoints/epoch=8-step=567.ckpt
 # test_file_list: ["data/NewsEmp2023/WASSA23_essay_level_test.tsv"]
 test_file_list: ["data/NewsEmp2024/test_data_with_labels/goldstandard_EMP.csv"]

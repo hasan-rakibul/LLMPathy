@@ -140,7 +140,8 @@ class DataModuleFromRaw:
         # all_data.to_csv("tmp/all_data.tsv", sep='\t', index=False) # save the data for debugging
 
         # add sample_id column
-        all_data['sample_id'] = range(len(all_data))     
+        # all_data['sample_id'] = range(len(all_data))     
+        
         all_data_hf = Dataset.from_pandas(all_data, preserve_index=False) # convert to huggingface dataset
         
         # tokenise

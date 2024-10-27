@@ -1,14 +1,14 @@
-resume_optuna_dir: logs/20241020_113604_Tune-LLM-GEm # Comment out or dir of optuna.db file
-expt_name: Tune-LLM-GEm
+resume_optuna_dir: logs/20241023_141040_Tune-LLMGEm-ImprovedPCC-Multi # Comment out or dir of optuna.db file
+expt_name: Tune-LLMGEm-ImprovedPCC-Multi
 # expt_name: Tune_OnlyAgentic_Only2022_Augm # NOT used if any resume_optuna_dir is provided
 logging_dir: ./logs # NOT used if any resume_optuna_dir is provided
-n_optuna_trails: 300
+n_optuna_trails: 200
 
-# objectives: ["val_pcc", "val_ccc", "val_rmse"]
-# directions: ["maximize", "maximize", "minimize"]
+objectives: ["val_pcc", "val_ccc", "val_rmse"]
+directions: ["maximize", "maximize", "minimize"]
 
-objectives: ["val_pcc"]
-directions: ["maximize"]
+# objectives: ["val_pcc"]
+# directions: ["maximize"]
 
 # boolean flags. No need to provide values
 # --debug_mode: 
@@ -34,5 +34,5 @@ save_predictions_to_disk: False # won't save during val
 # train_file_list: ["data/ProcessedNewsEmp/messages_train_ready_for_WS_2022_llm_augm.tsv"]
 # val_file_list: ["data/ProcessedNewsEmp/messages_dev_features_ready_for_WS_2022_demographic-essay.tsv"]
 
-train_file_list: ["data/NewsEmp2024/trac3_EMP_train_llm.tsv"]
+train_file_list: ["data/NewsEmp2024/trac3_EMP_train_llama.tsv"]
 val_file_list: ["data/NewsEmp2024/trac3_EMP_dev.csv"]

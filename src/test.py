@@ -20,7 +20,7 @@ def _submission_ready(save_dir: str) -> None:
         zf.write(f"{save_dir}/test-predictions_EMP.tsv", arcname="predictions_EMP.tsv")
         log_info(logger, f"Zipped predictions to {save_dir}/predictions.zip")
 
-def _test(config):
+def test_plm(config):
     assert os.path.exists(config.load_from_checkpoint), "valid load_from_checkpoint is required for test_mode"
     
     datamodule = DataModuleFromRaw(config)
@@ -49,6 +49,13 @@ def _test(config):
 
     if "--submission_ready" in config:
         _submission_ready(save_dir=config.logging_dir)
+
+    metrics = {
+        "test_pcc": trainer.callback_metrics["test_pcc"].item(),
+        "test_ccc": trainer.callback_metrics["test_ccc"].item(),
+        "test_rmse": trainer.callback_metrics["test_rmse"].item()
+    }
+    return metrics
 
 def _test_zero_shot(filepath: str, val_goldstandard_filepath: str = None) -> None:
     df = read_file(filepath)
@@ -96,7 +103,7 @@ if __name__ == "__main__":
         L.seed_everything(config.seed)
         log_info(logger, f"Normal testing on {config.test_file_list}")
         config.logging_dir = resolve_logging_dir(config) # update customised logging_dir
-        _test(config)
+        test_plm(config)
     elif "test_zero_shot_file" in config:
         log_info(logger, f"Zero shot testing on {config.test_zero_shot_file}")
         if "val_goldstandard_file" in config:

@@ -1,29 +1,31 @@
-seed: 0
+seeds: [0, 42, 100, 999, 1234]
 num_workers: 12
 plm: roberta-base
-num_epochs: 20
-lr: 3.8e-5
-batch_size: 2
+# plm: siebert/sentiment-roberta-large-english
+
+num_epochs: 10
+lr: 2e-05
+batch_size: 16
+max_length: 512
+
 logging_dir: ./logs
 # fc_arch: [768, 512, 256, 1] # [out_transforer, out_pre_fusion, out_fusion, out]
-max_length: 512
 freeze_plm: False
 lr_find: False  # unfornately, it didn't work for me
 
-adamw_beta1: 0.88
+adamw_beta1: 0.9
 adamw_beta2: 0.98
-adamw_eps: 4.0e-7
-adamw_weight_decay: 0.035
+adamw_eps: 1e-06
+adamw_weight_decay: 0.1
 
-# lr_scheduler_type: linear
-# linear_warmup: 0.06
+lr_scheduler_type: linear
+linear_warmup: 0.06
+# linear_num_warmup_steps: 300
 
-lr_scheduler_type: plateau
-plateau_patience: 7
-plateau_factor: 0.326
-plateau_threshold: 0.0075
-
-# alpha: 3.5
+# lr_scheduler_type: plateau
+# plateau_patience: 10
+# plateau_factor: 0.676
+# plateau_threshold: 0.0057
 
 label_column: empathy
 # llm_column: llm_empathy
@@ -33,9 +35,8 @@ feature_to_tokenise: ["essay"]
 extra_columns_to_keep: []
 
 ### extra column in train only
-# extra_columns_to_keep_train: []
-extra_columns_to_keep_train: ["llm_empathy"]
-
+extra_columns_to_keep_train: []
+# extra_columns_to_keep_train: ["llm_empathy"]
 
 # demographics: ['gender', 'education', 'race', 'age', 'income']
 # demographics_2024: ['person_id']

@@ -79,12 +79,13 @@ class LightningPLM(L.LightningModule):
         self.learning_rate = self.config.lr # separate for lr tuning by lightning
 
         if "fc_arch" in self.config:
-            raise NotImplementedError("FusionFC is forward is commented out")
+            raise NotImplementedError("FusionFC forward is commented out")
             self.model = RoBERTaFusionFC(self.config)
         else:
             self.model = AutoModelForSequenceClassification.from_pretrained(
                 pretrained_model_name_or_path=self.config.plm,
-                num_labels=1
+                num_labels=1,
+                # ignore_mismatched_sizes=True # SieBERT has 2 output labels so we ignore mismatched sizes
             )
 
         self.training_step_outputs = []
@@ -134,9 +135,14 @@ class LightningPLM(L.LightningModule):
             )
         elif self.config.lr_scheduler_type == "linear":
             num_training_step = self.config.num_training_steps
+            if "linear_num_warmup_steps" in self.config:
+                num_warmup_steps = self.config.linear_num_warmup_steps
+            else:
+                assert "linear_warmup" in self.config, "linear_warmup not found in config"
+                num_warmup_steps = self.config.linear_warmup*num_training_step
             lr_scheduler = get_linear_schedule_with_warmup(
                 optimiser,
-                num_warmup_steps=self.config.linear_warmup*num_training_step,
+                num_warmup_steps=num_warmup_steps,
                 num_training_steps=num_training_step
             )
         return {
@@ -156,7 +162,7 @@ class LightningPLM(L.LightningModule):
         return outputs
     
     @rank_zero_only
-    def _calc_save_predictions(self, preds, labels=None, mode='test'):
+    def _calc_save_predictions(self, preds, mode='test'):
         preds_np = preds.numpy()
         
         pred_df = pd.DataFrame({'emp': preds_np, 'dis': preds_np}) # we're not predicting distress, just aligning with submission system
@@ -166,19 +172,6 @@ class LightningPLM(L.LightningModule):
         )
         log_info(logger, f'Saved predictions to {self.config.logging_dir}/{mode}-predictions_EMP.tsv')
         
-        if labels is not None:
-            pcc_score = pearson_corrcoef(preds, labels).item()
-            ccc_score = concordance_corrcoef(preds, labels).item()
-            rmse_score = mean_squared_error(preds, labels, squared=False).item()
-            pcc_score = round(pcc_score, 3)
-            ccc_score = round(ccc_score, 3)
-            rmse_score = round(rmse_score, 3)
-
-            log_info(logger, f"PCC & CCC & RMSE: {pcc_score} & {ccc_score} & {rmse_score}")
-
-            with open(os.path.join(self.config.logging_dir, f"metrics.txt"), 'a') as f:
-                f.write(f"{mode} - PCC & CCC & RMSE: {pcc_score} & {ccc_score} & {rmse_score}\n")
-
     def training_step(self, batch, batch_idx):
         outputs = self(batch)
 
@@ -264,7 +257,7 @@ class LightningPLM(L.LightningModule):
         )
 
         if self.config.save_predictions_to_disk:
-            self._calc_save_predictions(all_preds, all_labels, mode='val')
+            self._calc_save_predictions(all_preds, mode='val')
 
         self.validation_step_outputs.clear()
         self.validation_step_labels.clear()
@@ -288,8 +281,31 @@ class LightningPLM(L.LightningModule):
         else:
             all_labels = None
 
+        if all_labels is not None:
+            self.log(
+                'test_pcc',
+                pearson_corrcoef(all_preds, all_labels),
+                logger=False,
+                prog_bar=True,
+                sync_dist=True
+            )
+            self.log(
+                'test_ccc',
+                concordance_corrcoef(all_preds, all_labels),
+                logger=False,
+                prog_bar=True,
+                sync_dist=True
+            )
+            self.log(
+                'test_rmse',
+                mean_squared_error(all_preds, all_labels, squared=False),
+                logger=False,
+                prog_bar=True,
+                sync_dist=True
+            )
+
         if self.config.save_predictions_to_disk:
-            self._calc_save_predictions(all_preds, all_labels, mode='test')
+            self._calc_save_predictions(all_preds, mode='test')
 
         self.test_step_outputs.clear()
         self.test_step_labels.clear()

@@ -4,10 +4,12 @@ import torch
 import transformers
 import lightning as L
 from omegaconf import OmegaConf
+import pandas as pd
 
 from utils import log_info, get_trainer, resolve_logging_dir
 from preprocess import DataModuleFromRaw
 from model import LightningPLM
+from test import test_plm
 
 logger = logging.getLogger(__name__)
 
@@ -25,16 +27,17 @@ def train_vanilla_plm(config, train_dl=None):
             # number of training steps is required for linear scheduler
             config.num_training_steps = len(train_dl) * config.num_epochs
 
-        # commented out as I moved the model initialisation in the later part
-        # if config.lr_find: # didn't work well in a casual run
-        #     # https://lightning.ai/docs/pytorch/stable/advanced/training_tricks.html
-        #     tuner = L.pytorch.tuner.Tuner(trainer)
-        #     lr_finder = tuner.lr_find(model=model, train_dataloaders=train_dl, val_dataloaders=val_dl)
-        #     fig = lr_finder.plot(suggest=True)
-        #     fig.savefig(os.path.join(config.logging_dir, "lr_finder.png"))
-        #     log_info(logger, f"lr_finder plot saved at {config.logging_dir}/lr_finder.png")
-        #     config.lr = lr_finder.suggestion() # update config
-        #     model.learning_rate = lr_finder.suggestion() # update model
+        if config.lr_find: # didn't work well in a casual run
+            raise NotImplementedError("lr_find needs to be re-configured as the model initialisation is moved to later part")
+            # https://lightning.ai/docs/pytorch/stable/advanced/training_tricks.html
+            tuner = L.pytorch.tuner.Tuner(trainer)
+            lr_finder = tuner.lr_find(model=model, train_dataloaders=train_dl, val_dataloaders=val_dl)
+            fig = lr_finder.plot(suggest=True)
+            fig.savefig(os.path.join(config.logging_dir, "lr_finder.png"))
+            log_info(logger, f"lr_finder plot saved at {config.logging_dir}/lr_finder.png")
+            config.lr = lr_finder.suggestion() # update config
+            model.learning_rate = lr_finder.suggestion() # update model
+        
         if "load_from_checkpoint" in config:
             log_info(logger, f"Resuming training from {config.load_from_checkpoint}")
             # https://lightning.ai/docs/pytorch/stable/advanced/model_init.html
@@ -87,10 +90,16 @@ def train_vanilla_plm(config, train_dl=None):
     with trainer.init_module(empty_init=True):
         model = LightningPLM.load_from_checkpoint(best_model_ckpt)
 
-    model.config.save_predictions_to_disk = True # save final predictions to disk
+    # model.config.save_predictions_to_disk = True # save final predictions to disk
     trainer.validate(model=model, dataloaders=val_dl)
 
-    return best_model_ckpt
+    metrics = {
+        "val_pcc": trainer.callback_metrics["val_pcc"].item(),
+        "val_ccc": trainer.callback_metrics["val_ccc"].item(),
+        "val_rmse": trainer.callback_metrics["val_rmse"].item()
+    }
+
+    return best_model_ckpt, metrics
 
 if __name__ == "__main__":
     transformers.logging.set_verbosity_error()
@@ -99,28 +108,58 @@ if __name__ == "__main__":
 
     config = OmegaConf.merge(config_common, config_train)
 
-    L.seed_everything(config.seed)
-    
     if "updated_train_dl_file" in config:
         train_dl = torch.load(config.updated_train_dl_file, weights_only=False)
         log_info(logger, f"Loaded updated train_dl from {config.updated_train_dl_file}")
         log_info(logger, f"Total number of training samples: {len(train_dl.dataset)}")
         config.logging_dir = os.path.dirname(config.updated_train_dl_file)
-        best_model_ckpt = train_vanilla_plm(config, train_dl)
-    else:
-        if "--debug_mode" in config:
-            logger.setLevel(logging.DEBUG)
-            # delete the logs
-            config.logging_dir = "./tmp"
-            log_info(logger, f"Debug mode is on. Using {config.logging_dir} for storing log files.")
-        
-        config.logging_dir = resolve_logging_dir(config) # update customised logging_dir
-        best_model_ckpt = train_vanilla_plm(config)
+        _ = train_vanilla_plm(config, train_dl)
 
-    if "--do_test" in config:
-        from test import _test
-        config_test = OmegaConf.load("config/config_test.yaml")
-        config = OmegaConf.merge(config_common, config_test)
-        config.load_from_checkpoint = best_model_ckpt
-        config.logging_dir = resolve_logging_dir(config)
-        _test(config)
+    if "--debug_mode" in config:
+        logger.setLevel(logging.DEBUG)
+        # delete the logs
+        config.logging_dir = "./tmp"
+        log_info(logger, f"Debug mode is on. Using {config.logging_dir} for storing log files.")
+
+    parent_logging_dir = resolve_logging_dir(config) # update customised logging_dir
+    results = []
+    for seed in config.seeds:
+        config.seed = seed
+        log_info(logger, f"Current seed: {config.seed}")
+        config.logging_dir = os.path.join(parent_logging_dir, f"seed_{config.seed}")
+
+        L.seed_everything(config.seed)
+        best_model_ckpt, metrics = train_vanilla_plm(config)
+
+        if "--do_test" in config:
+            config_test = OmegaConf.load("config/config_test.yaml")
+            config_test = OmegaConf.merge(config_common, config_test)
+            config_test.load_from_checkpoint = best_model_ckpt
+            config_test.logging_dir = resolve_logging_dir(config_test)
+            config_test.seed = seed
+            test_metrics = test_plm(config_test)
+            metrics = {**metrics, **test_metrics} # merge the two dictionaries
+
+        metrics["seed/stat"] = str(seed) # as I want to store string in this column
+        log_info(logger, f"Metrics: {metrics}")
+        results.append(metrics)
+    
+    results_df = pd.DataFrame(results)
+    
+    # post-processing
+    mean_row = results_df.mean(numeric_only=True)
+    std_row = results_df.std(numeric_only=True)
+    median_row = results_df.median(numeric_only=True)
+    
+    # Assign a label to identify each row
+    mean_row["seed/stat"] = "mean"
+    std_row["seed/stat"] = "std"
+    median_row["seed/stat"] = "median"
+
+    results_df = pd.concat([results_df, mean_row.to_frame().T, std_row.to_frame().T, median_row.to_frame().T], ignore_index=True)
+
+    results_df = results_df.infer_objects() # metrics columns were converted to object, so convert them back to float
+    results_df = results_df.round(3)
+    
+    results_df.to_csv(os.path.join(parent_logging_dir, "results.csv"), index=False)
+    log_info(logger, f"Results saved at {parent_logging_dir}/results.csv")
