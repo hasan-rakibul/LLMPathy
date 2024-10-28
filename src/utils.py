@@ -41,18 +41,20 @@ def get_trainer(config, devices="auto", extra_callbacks=None, enable_checkpointi
     ModelCheckpoint is enabled if enable_checkpointing is True.
     If you want to add more callbacks, pass them in extra_callbacks.
     """
+    # early_stopping = EarlyStopping(
+    #     monitor="val_pcc",
+    #     patience=5,
+    #     mode="max",
+    #     min_delta=0.001
+    # )
+    # maybe val_pcc is not a good idea as pcc is not correlated beween val and test
+
     early_stopping = EarlyStopping(
-        monitor="val_pcc",
+        monitor="val_loss",
         patience=5,
-        mode="max",
+        mode="min",
         min_delta=0.001
     )
-    # early_stopping = EarlyStopping(
-    #     monitor="val_loss",
-    #     patience=3,
-    #     mode="min",
-    #     min_delta=0.01
-    # )
     callbacks = []
     
     callbacks.append(early_stopping)
@@ -60,14 +62,25 @@ def get_trainer(config, devices="auto", extra_callbacks=None, enable_checkpointi
     
     if enable_checkpointing:
         # have a ModelCheckpoint callback
-        callbacks.append(
-            ModelCheckpoint(
-                monitor="val_pcc",
-                save_top_k=1,
-                mode="max"
-            )
+        # callbacks.append(
+        #     ModelCheckpoint(
+        #         monitor="val_pcc",
+        #         save_top_k=1,
+        #         mode="max"
+        #     )
+        # )
+        # checkpoint = ModelCheckpoint(
+        #     monitor="val_loss",
+        #     save_top_k=1,
+        #     mode="min"
+        # )
+        checkpoint = ModelCheckpoint(
+            save_last=True,
+            save_top_k=1
         )
-    
+        
+        callbacks.append(checkpoint)
+        
     callbacks.extend(extra_callbacks) if extra_callbacks else None
 
     trainer = L.Trainer(

@@ -35,6 +35,8 @@ class DataModuleFromRaw:
         in place because pandas dataframes are mutable
 
         """
+        assert 'empathy' in data.columns, "empathy column not found in the data"
+        assert 'llm_empathy' in data.columns, "llm_empathy column not found in the data"
         # Calculate the absolute difference between 'empathy' and 'llm_empathy'
         condition = np.abs(data['empathy'] - data['llm_empathy']) > self.config.alpha
         log_info(logger, f"Number of labels updated (crowdsourced labels --> LLM labels): {condition.sum()}")

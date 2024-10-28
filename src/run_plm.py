@@ -86,7 +86,8 @@ def train_vanilla_plm(config, train_dl=None):
             devices=1,
             max_epochs=1
         )
-
+        
+    log_info(logger, f"Loading the best model from {best_model_ckpt}")
     with trainer.init_module(empty_init=True):
         model = LightningPLM.load_from_checkpoint(best_model_ckpt)
 
@@ -140,26 +141,31 @@ if __name__ == "__main__":
             test_metrics = test_plm(config_test)
             metrics = {**metrics, **test_metrics} # merge the two dictionaries
 
-        metrics["seed/stat"] = str(seed) # as I want to store string in this column
+        metrics["seed"] = seed
         log_info(logger, f"Metrics: {metrics}")
         results.append(metrics)
     
     results_df = pd.DataFrame(results)
-    
-    # post-processing
-    mean_row = results_df.mean(numeric_only=True)
-    std_row = results_df.std(numeric_only=True)
-    median_row = results_df.median(numeric_only=True)
-    
-    # Assign a label to identify each row
-    mean_row["seed/stat"] = "mean"
-    std_row["seed/stat"] = "std"
-    median_row["seed/stat"] = "median"
 
-    results_df = pd.concat([results_df, mean_row.to_frame().T, std_row.to_frame().T, median_row.to_frame().T], ignore_index=True)
-
-    results_df = results_df.infer_objects() # metrics columns were converted to object, so convert them back to float
+    results_df.set_index("seed", inplace=True)
     results_df = results_df.round(3)
     
-    results_df.to_csv(os.path.join(parent_logging_dir, "results.csv"), index=False)
+    # post-processing
+    mean_row = results_df.mean(numeric_only=True).round(3)
+    std_row = results_df.std(numeric_only=True).round(3)
+    median_row = results_df.median(numeric_only=True).round(3)
+    
+    # Assign a label to identify each row
+    mean_row.name = "mean"
+    std_row.name = "std"
+    median_row.name = "median"
+
+    results_df = pd.concat([results_df, mean_row.to_frame().T, std_row.to_frame().T, median_row.to_frame().T])
+    
+    results_df.to_csv(os.path.join(parent_logging_dir, "results.csv"), index=True)
     log_info(logger, f"Results saved at {parent_logging_dir}/results.csv")
+
+    # print the result, in LaTeX-table style
+    log_info(logger, "Val PCC & Val CCC & Val RMSE & Test PCC & Test CCC & Test RMSE (mean +/- std)")
+    log_info(logger, " & ".join([f"${mean:.3f}\\pm {std:.3f}$"\
+            for mean, std in zip(mean_row, std_row)]))
