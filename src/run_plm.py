@@ -4,6 +4,7 @@ import torch
 import transformers
 import lightning as L
 from omegaconf import OmegaConf
+import numpy as np
 import pandas as pd
 
 from utils import log_info, get_trainer, resolve_logging_dir
@@ -102,27 +103,12 @@ def train_vanilla_plm(config, train_dl=None):
 
     return best_model_ckpt, metrics
 
-if __name__ == "__main__":
-    transformers.logging.set_verbosity_error()
-    config_train = OmegaConf.load("config/config_train.yaml")
-    config_common = OmegaConf.load("config/config_common.yaml")
-
-    config = OmegaConf.merge(config_common, config_train)
-
-    if "updated_train_dl_file" in config:
-        train_dl = torch.load(config.updated_train_dl_file, weights_only=False)
-        log_info(logger, f"Loaded updated train_dl from {config.updated_train_dl_file}")
-        log_info(logger, f"Total number of training samples: {len(train_dl.dataset)}")
-        config.logging_dir = os.path.dirname(config.updated_train_dl_file)
-        _ = train_vanilla_plm(config, train_dl)
-
-    if "--debug_mode" in config:
-        logger.setLevel(logging.DEBUG)
-        # delete the logs
-        config.logging_dir = "./tmp"
-        log_info(logger, f"Debug mode is on. Using {config.logging_dir} for storing log files.")
-
-    parent_logging_dir = resolve_logging_dir(config) # update customised logging_dir
+def _run_multi_seeds(config: OmegaConf) -> None:
+    if "--do_test" in config:
+        config_test = OmegaConf.load("config/config_test.yaml")
+        config_test = OmegaConf.merge(config_common, config_test)
+    
+    parent_logging_dir = config.logging_dir
     results = []
     for seed in config.seeds:
         config.seed = seed
@@ -133,8 +119,6 @@ if __name__ == "__main__":
         best_model_ckpt, metrics = train_vanilla_plm(config)
 
         if "--do_test" in config:
-            config_test = OmegaConf.load("config/config_test.yaml")
-            config_test = OmegaConf.merge(config_common, config_test)
             config_test.load_from_checkpoint = best_model_ckpt
             config_test.logging_dir = resolve_logging_dir(config_test)
             config_test.seed = seed
@@ -169,3 +153,39 @@ if __name__ == "__main__":
     log_info(logger, "Val PCC & Val CCC & Val RMSE & Test PCC & Test CCC & Test RMSE (mean +/- std)")
     log_info(logger, " & ".join([f"${mean:.3f}\\pm {std:.3f}$"\
             for mean, std in zip(mean_row, std_row)]))
+
+if __name__ == "__main__":
+    transformers.logging.set_verbosity_error()
+    config_train = OmegaConf.load("config/config_train.yaml")
+    config_common = OmegaConf.load("config/config_common.yaml")
+
+    config = OmegaConf.merge(config_common, config_train)
+
+    if "updated_train_dl_file" in config:
+        train_dl = torch.load(config.updated_train_dl_file, weights_only=False)
+        log_info(logger, f"Loaded updated train_dl from {config.updated_train_dl_file}")
+        log_info(logger, f"Total number of training samples: {len(train_dl.dataset)}")
+        config.logging_dir = os.path.dirname(config.updated_train_dl_file)
+        _ = train_vanilla_plm(config, train_dl)
+
+    if "--debug_mode" in config:
+        logger.setLevel(logging.DEBUG)
+        config.seeds = config.seeds[:2] # reduce the number of seeds for debugging
+        config.logging_dir = "./tmp"
+        log_info(logger, f"Debug mode is on. Using {config.logging_dir} for storing log files.")
+    
+    config.logging_dir = resolve_logging_dir(config) # update customised logging_dir
+    if config.main_label == "y":
+        _run_multi_seeds(config)
+    elif config.main_label == "y'":
+        assert "llm_empathy" in config.extra_columns_to_keep_train, "llm_empathy must be included in extra_columns_to_keep_train"
+        alpha_range = np.arange(0, 6.5, 0.5)
+        parent_logging_dir = config.logging_dir
+        for alpha in alpha_range:
+            config.logging_dir = os.path.join(parent_logging_dir, f"alpha_{alpha}")
+            config.alpha = alpha.item() # convertin to python float gas numpy.float64 is not supported by OmegaConf
+            log_info(logger, f"Current alpha: {config.alpha}")
+            _run_multi_seeds(config)
+    else:
+        raise ValueError("Invalid experiment type")
+    
