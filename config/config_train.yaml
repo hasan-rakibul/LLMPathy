@@ -1,20 +1,19 @@
 # boolean flags. No need to provide values
-# --debug_mode: # will run only 1 epoch of training with 1% of training data, saves logs in tmp/ directory
---do_test: # will run test immediately after training
+--debug_mode: # will run only 1 epoch of training with 1% of training data, saves logs in tmp/ directory
+
+do_test: False # whether to run subsequent test or not
+# test_file_list: ["data/NewsEmp2024/test_data_with_labels/goldstandard_EMP.csv"]
+
+# main_label: y
+main_label: y' # means a sweep over alpha range
 
 # expt_name: LLMGEm+2023Llama-MultiOptuna
-# expt_name: SieBERT 
-expt_name: baseline
+expt_name: LLMGEm
+# expt_name: baseline+2023+2022
 
-val_only: False
-
-# alpha: 2.83
-
+# resume_train_from_checkpoint: logs/20241023_205914_vanilla+2023LLM/lightning_logs/version_17110004/checkpoints/epoch=5-step=378.ckpt
+# val_from_checkpoint:
 # finetune_from_checkpoint: logs/20241023_213441_LLMGEm+2023LLM/lightning_logs/version_17195570/checkpoints/epoch=19-step=1260.ckpt
-
-# load_from_checkpoint: logs/20241023_205914_vanilla+2023LLM/lightning_logs/version_17110004/checkpoints/epoch=5-step=378.ckpt 
-
-save_predictions_to_disk: False # so that we don't save all val steps each epoch
 
 # updated_train_dl_file: ./logs/20241017_124809_Agentic-2022-2023-EssayDn/updated_train_dl.pt
 
@@ -40,6 +39,7 @@ train_file_list: ["data/NewsEmp2024/trac3_EMP_train_llama.tsv"]
 val_file_list: ["data/NewsEmp2024/trac3_EMP_dev.csv"]
 
 # train_file_only_LLM_list: ["data/NewsEmp2023/WASSA23_essay_level_with_labels_train_llama.tsv", "data/NewsEmp2023/WASSA23_essay_level_dev_llama.tsv"]
-# train_file_only_LLM_list: ["data/NewsEmp2022/messages_train_ready_for_WS_gpt.tsv", "data/NewsEmp2022/messages_dev_features_ready_for_WS_2022_gpt.tsv"]
+# train_file_only_LLM_list: ["data/NewsEmp2022/messages_train_ready_for_WS_llama.tsv", "data/NewsEmp2022/messages_dev_features_ready_for_WS_2022_llama.tsv"]
 
 # train_file_only_LLM_list: ["data/NewsEmp2023/WASSA23_essay_level_with_labels_train_gpt.tsv", "data/NewsEmp2023/WASSA23_essay_level_dev_gpt.tsv", "data/NewsEmp2022/messages_train_ready_for_WS_gpt.tsv", "data/NewsEmp2022/messages_dev_features_ready_for_WS_2022_gpt.tsv"]
+# train_file_only_LLM_list: ["data/NewsEmp2023/WASSA23_essay_level_with_labels_train_llama.tsv", "data/NewsEmp2023/WASSA23_essay_level_dev_llama.tsv", "data/NewsEmp2022/messages_train_ready_for_WS_llama.tsv", "data/NewsEmp2022/messages_dev_features_ready_for_WS_2022_llama.tsv"]

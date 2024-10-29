@@ -7,10 +7,9 @@ from model import LightningPLM
 import zipfile
 import logging
 import torch
-import argparse
 from torchmetrics.functional import pearson_corrcoef, concordance_corrcoef, mean_squared_error
 import pandas as pd
-from utils import resolve_logging_dir, log_info, read_file
+from utils import resolve_logging_dir, log_info, read_file, resolve_seed_wise_checkpoint, process_seedwise_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +20,7 @@ def _submission_ready(save_dir: str) -> None:
         log_info(logger, f"Zipped predictions to {save_dir}/predictions.zip")
 
 def test_plm(config):
-    assert os.path.exists(config.load_from_checkpoint), "valid load_from_checkpoint is required for test_mode"
+    assert os.path.exists(config.test_from_checkpoint), "valid test_from_checkpoint is required for test_mode"
     
     datamodule = DataModuleFromRaw(config)
     trainer = L.Trainer(
@@ -32,9 +31,9 @@ def test_plm(config):
 
 
     with trainer.init_module(empty_init=True):
-        model = LightningPLM.load_from_checkpoint(config.load_from_checkpoint)
+        model = LightningPLM.load_from_checkpoint(config.test_from_checkpoint)
 
-    log_info(logger, f"Loaded model from {config.load_from_checkpoint}")
+    log_info(logger, f"Loaded model from {config.test_from_checkpoint}")
     
     if "2024" in config.test_file_list[0]:
         test_dl = datamodule.get_test_dl(data_path_list=config.test_file_list, have_label=True)
@@ -56,6 +55,22 @@ def test_plm(config):
         "test_rmse": trainer.callback_metrics["test_rmse"].item()
     }
     return metrics
+
+def _test_multi_seeds(ckpt_parent_dir: str, config: OmegaConf) -> None:
+    results = []
+
+    for seed in config.seeds:
+        config.seed = seed
+        log_info(logger, f"Current seed: {config.seed}")
+        config.test_from_checkpoint = resolve_seed_wise_checkpoint(ckpt_parent_dir, seed)
+        config.logging_dir = ckpt_parent_dir
+        test_metrics = test_plm(config)
+        test_metrics["seed"] = seed
+        log_info(logger, f"Metrics: {test_metrics}")
+        results.append(test_metrics)
+
+    save_as = os.path.join(ckpt_parent_dir, "results_test.csv")
+    process_seedwise_metrics(results, save_as)
 
 def _test_zero_shot(filepath: str, val_goldstandard_filepath: str = None) -> None:
     df = read_file(filepath)
@@ -90,20 +105,20 @@ def _test_zero_shot(filepath: str, val_goldstandard_filepath: str = None) -> Non
 if __name__ == "__main__":
     transformers.logging.set_verbosity_error()
     
-    parser = argparse.ArgumentParser(description='Test the model')
-    parser.add_argument('--config', default="config/config_test.yaml", type=str, help='Test config file path')
-    
-    args = parser.parse_args()
-    config_test = OmegaConf.load(args.config)
+    config_test = OmegaConf.load("config/config_test.yaml")
     
     config_common = OmegaConf.load("config/config_common.yaml")
     config = OmegaConf.merge(config_common, config_test)
     
-    if "test_file_list" in config:
+    if "test_from_checkpoint" in config:
+        log_info(logger, f"Doing a single test using {config.test_file_list}")
         L.seed_everything(config.seed)
         log_info(logger, f"Normal testing on {config.test_file_list}")
         config.logging_dir = resolve_logging_dir(config) # update customised logging_dir
         test_plm(config)
+    elif "test_from_ckpts_parent_dir" in config:
+        log_info(logger, f"Multi-seed testing from {config.test_from_ckpts_parent_dir}")
+        _test_multi_seeds(config.test_from_ckpts_parent_dir, config)
     elif "test_zero_shot_file" in config:
         log_info(logger, f"Zero shot testing on {config.test_zero_shot_file}")
         if "val_goldstandard_file" in config:

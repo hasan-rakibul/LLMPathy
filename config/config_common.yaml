@@ -35,8 +35,8 @@ feature_to_tokenise: ["essay"]
 extra_columns_to_keep: []
 
 ### extra column in train only
-extra_columns_to_keep_train: []
-# extra_columns_to_keep_train: ["llm_empathy"]
+# extra_columns_to_keep_train: []
+extra_columns_to_keep_train: ["llm_empathy"]
 
 # demographics: ['gender', 'education', 'race', 'age', 'income']
 # demographics_2024: ['person_id']

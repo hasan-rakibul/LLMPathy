@@ -1,9 +1,17 @@
-############ Used for most of the experiments ############
-
 # Boolean flags. No need to provide values 
 # --submission_ready:
 
 save_predictions_to_disk: False # True or False
-load_from_checkpoint: logs/20241026_205612_SieBERT/lightning_logs/version_17661371/checkpoints/epoch=8-step=567.ckpt
-# test_file_list: ["data/NewsEmp2023/WASSA23_essay_level_test.tsv"]
-test_file_list: ["data/NewsEmp2024/test_data_with_labels/goldstandard_EMP.csv"]
+
+test_from_ckpts_parent_dir: logs/20241028_145547_LLMGEm/alpha_1.5
+# test_from_checkpoint: logs/20241026_205612_SieBERT/lightning_logs/version_17661371/checkpoints/epoch=8-step=567.ckpt
+
+# test_file_list: ["data/NewsEmp2024/test_data_with_labels/goldstandard_EMP.csv"]
+
+# test on validation data
+# test_file_list: ["data/NewsEmp2024/trac3_EMP_dev.csv"]
+
+#### zero-shot test using LLM
+# test_zero_shot_file: data/NewsEmp2024/trac3_EMP_dev_llama.tsv
+## goldstand required for some val files
+# val_goldstandard_file: data/NewsEmp2022/goldstandard_dev_2022.tsv

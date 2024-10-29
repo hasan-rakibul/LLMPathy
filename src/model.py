@@ -256,8 +256,8 @@ class LightningPLM(L.LightningModule):
             sync_dist=True
         )
 
-        if self.config.save_predictions_to_disk:
-            self._calc_save_predictions(all_preds, mode='val')
+        # if self.config.save_predictions_to_disk:
+        #     self._calc_save_predictions(all_preds, mode='val')
 
         self.validation_step_outputs.clear()
         self.validation_step_labels.clear()

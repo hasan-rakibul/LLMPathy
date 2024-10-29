@@ -1,4 +1,5 @@
 import os
+from typing import List
 import datetime
 import logging
 import lightning as L
@@ -8,6 +9,7 @@ import matplotlib.pyplot as plt
 import scienceplots
 
 import pandas as pd
+import glob
 
 from lightning.pytorch.utilities import rank_zero_only
 
@@ -75,8 +77,7 @@ def get_trainer(config, devices="auto", extra_callbacks=None, enable_checkpointi
         #     mode="min"
         # )
         checkpoint = ModelCheckpoint(
-            save_last=True,
-            save_top_k=1
+            save_top_k=1 # saves the last checkpoint; no need to save_last=True as it will save another checkpoint unnecessarily
         )
         
         callbacks.append(checkpoint)
@@ -98,9 +99,9 @@ def get_trainer(config, devices="auto", extra_callbacks=None, enable_checkpointi
     return trainer
 
 def resolve_logging_dir(config):
-    if "load_from_checkpoint" in config:
-        assert os.path.exists(config.load_from_checkpoint), "checkpoint_dir does not exist"
-        path_list = config.load_from_checkpoint.split("/")[:-4] # logs/.../ ; calculate from end as we may have ./logs/ or just logs/
+    if "resume_train_from_checkpoint" in config:
+        assert os.path.exists(config.resume_train_from_checkpoint), "checkpoint_dir does not exist"
+        path_list = config.resume_train_from_checkpoint.split("/")[:-4] # logs/.../ ; calculate from end as we may have ./logs/ or just logs/
         logging_dir = os.path.join(*path_list)   
     elif "finetune_from_checkpoint" in config:
         assert os.path.exists(config.finetune_from_checkpoint), "checkpoint_dir does not exist"
@@ -108,12 +109,47 @@ def resolve_logging_dir(config):
         # add additional directory for finetuning
         path_list.append("finetune")
         logging_dir = os.path.join(*path_list)
+    elif "test_from_checkpoint" in config:
+        assert os.path.exists(config.test_from_checkpoint), "checkpoint_dir does not exist"
+        path_list = config.test_from_checkpoint.split("/")[:-4]
+        logging_dir = os.path.join(*path_list)
     else:
         logging_dir=os.path.join(
             config.logging_dir, 
             datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + config.expt_name
         )
     return logging_dir
+
+def resolve_seed_wise_checkpoint(parent_dir: str, seed: float) -> str:
+    ckpt = glob.glob(os.path.join(parent_dir, f"seed_{seed}/**/*.ckpt"), recursive=True)
+    assert len(ckpt) == 1, f"Found {len(ckpt)} checkpoints for seed {seed}"
+    return ckpt[0]
+
+def process_seedwise_metrics(results: List, save_as: str) -> None:
+    results_df = pd.DataFrame(results)
+
+    results_df.set_index("seed", inplace=True)
+    results_df = results_df.round(3)
+    
+    # post-processing
+    mean_row = results_df.mean(numeric_only=True).round(3)
+    std_row = results_df.std(numeric_only=True).round(3)
+    median_row = results_df.median(numeric_only=True).round(3)
+    
+    # Assign a label to identify each row
+    mean_row.name = "mean"
+    std_row.name = "std"
+    median_row.name = "median"
+
+    results_df = pd.concat([results_df, mean_row.to_frame().T, std_row.to_frame().T, median_row.to_frame().T])
+    
+    results_df.to_csv(save_as, index=True)
+    log_info(logger, f"Results saved at {save_as}")
+
+    # print the result, in LaTeX-table style
+    log_info(logger, "[Val, Test] PCC & CCC & RMSE (mean +/- std)")
+    log_info(logger, " & ".join([f"${mean:.3f}\\pm {std:.3f}$"\
+            for mean, std in zip(mean_row, std_row)]))
 
 @rank_zero_only
 def log_info(logger, msg):
