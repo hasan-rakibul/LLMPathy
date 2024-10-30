@@ -1,6 +1,7 @@
 import random
 import numpy as np
 import pandas as pd
+import os
 
 import torch
 from torch.utils.data import DataLoader
@@ -56,18 +57,21 @@ class DataModuleFromRaw:
             self.config.extra_columns_to_keep
 
         # if it is val of 2022 and 2023, the labels are separate files
-        if mode == "val":
-            if "val_goldstandard_file" in self.config:
-                goldstandard = pd.read_csv(
-                    self.config.val_goldstandard_file, 
-                    sep='\t',
-                    header=None # had no header in the file
-                )
-                # first column is empathy
-                goldstandard = goldstandard.rename(columns={0: self.config.label_column})
-                data = pd.concat([data, goldstandard], axis=1)
-            else:
-                log_info(logger, "No goldstandard file is read. Assuming it is not required.")
+        val_goldstandard_file = None
+        if "WASSA23_essay_level_dev" in path:
+            val_goldstandard_file = "data/NewsEmp2023/goldstandard_dev.tsv"
+        elif "messages_dev_features_ready_for_WS_2022" in path:
+            val_goldstandard_file = "data/NewsEmp2022/goldstandard_dev_2022.tsv"
+        if val_goldstandard_file is not None:
+            assert os.path.exists(val_goldstandard_file), f"File {val_goldstandard_file} does not exist."
+            goldstandard = pd.read_csv(
+                val_goldstandard_file, 
+                sep='\t',
+                header=None # had no header in the file
+            )
+            # first column is empathy
+            goldstandard = goldstandard.rename(columns={0: self.config.label_column})
+            data = pd.concat([data, goldstandard], axis=1)
 
         if have_label:
             columns_to_keep.append(self.config.label_column)

@@ -5,8 +5,6 @@ import transformers
 import lightning as L
 from omegaconf import OmegaConf
 import numpy as np
-import pandas as pd
-import glob
 
 from utils import log_info, get_trainer, resolve_logging_dir, process_seedwise_metrics
 from preprocess import DataModuleFromRaw
@@ -146,8 +144,14 @@ if __name__ == "__main__":
         _train_multi_seeds(config)
     elif config.main_label == "y'":
         assert "llm_empathy" in config.extra_columns_to_keep_train, "llm_empathy must be included in extra_columns_to_keep_train"
+
         alpha_range = np.arange(0, 6.5, 0.5)
         parent_logging_dir = config.logging_dir
+
+        # if you want to run for a specific range of alpha, like to resume
+        # alpha_range = np.arange(3.5, 6.5, 0.5)
+        # parent_logging_dir = "logs/20241030_091522_LLMGEm+2023-and-2022"
+
         for alpha in alpha_range:
             config.logging_dir = os.path.join(parent_logging_dir, f"alpha_{alpha}")
             config.alpha = alpha.item() # convertin to python float gas numpy.float64 is not supported by OmegaConf
