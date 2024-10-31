@@ -140,7 +140,6 @@ if __name__ == "__main__":
     config = OmegaConf.merge(config_common, config_train)
 
     config = prepare_config(config)
-    import pdb; pdb.set_trace()
 
     if "updated_train_dl_file" in config:
         train_dl = torch.load(config.updated_train_dl_file, weights_only=False)

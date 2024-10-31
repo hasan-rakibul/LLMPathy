@@ -178,6 +178,12 @@ def plot(x, y, y2=None, xlabel=None, ylabel=None, legend=[], save=False, filenam
     fig.show()
 
 def prepare_config(config: OmegaConf) -> OmegaConf:
+
+    config.expt_name = f"{config.main_label}({','.join([str(data) for data in config.train_data])})"
+    if len(config.train_only_llm_data) > 0:
+        config.expt_name += f"-y_llm({','.join([str(data) for data in config.train_only_llm_data])})"
+    config.expt_name += f"-{config.expt_name_postfix}"
+
     config.train_file_list = []
 
     if config.main_label == "y":
