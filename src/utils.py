@@ -4,14 +4,13 @@ import datetime
 import logging
 import lightning as L
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
-
 import matplotlib.pyplot as plt
-import scienceplots
-
 import pandas as pd
 import glob
-
+from omegaconf import OmegaConf
 from lightning.pytorch.utilities import rank_zero_only
+import scienceplots
+plt.style.use(['science', 'tableau-colorblind10'])
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -53,7 +52,7 @@ def get_trainer(config, devices="auto", extra_callbacks=None, enable_checkpointi
 
     early_stopping = EarlyStopping(
         monitor="val_loss",
-        patience=5,
+        patience=3,
         mode="min",
         min_delta=0.001
     )
@@ -177,3 +176,32 @@ def plot(x, y, y2=None, xlabel=None, ylabel=None, legend=[], save=False, filenam
         print(f"Saved as {filename}.pdf")
         
     fig.show()
+
+def prepare_config(config: OmegaConf) -> OmegaConf:
+    config.train_file_list = []
+
+    if config.main_label == "y":
+        config.extra_columns_to_keep_train = []
+        for data in config.train_data:
+            config.train_file_list.append(config[data].train)
+            if data  == 2023 or data == 2022:
+                config.train_file_list.append(config[data].val) # add val data for 2022 and 2023
+    elif config.main_label == "y'":
+        config.extra_columns_to_keep_train = [config.llm_column]
+        for data in config.train_data:
+            config.train_file_list.append(config[data].train_llama)
+            if data  == 2023 or data == 2022:
+                config.train_file_list.append(config[data].val_llama) # add val data for 2022 and 2023
+    else:
+        raise ValueError(f"main_label must be either y or y'. Found {config.main_label}")
+
+    config.train_file_only_LLM_list = []
+    for data in config.train_only_llm_data:
+        config.train_file_only_LLM_list.append(config[data].train_llama)
+        if data == 2023 or data == 2022:
+            config.train_file_only_LLM_list.append(config[data].val_llama)
+
+    config.val_file_list = [config[2024].val] # fixed so far
+    config.test_file_list = [config[2024].test] # fixed so far
+
+    return config

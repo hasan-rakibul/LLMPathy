@@ -109,6 +109,8 @@ if __name__ == "__main__":
     
     config_common = OmegaConf.load("config/config_common.yaml")
     config = OmegaConf.merge(config_common, config_test)
+
+    config.batch_size = config.eval_batch_size
     
     if "test_from_checkpoint" in config:
         log_info(logger, f"Doing a single test using {config.test_file_list}")

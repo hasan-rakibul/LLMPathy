@@ -6,7 +6,7 @@ import lightning as L
 from omegaconf import OmegaConf
 import numpy as np
 
-from utils import log_info, get_trainer, resolve_logging_dir, process_seedwise_metrics
+from utils import log_info, get_trainer, resolve_logging_dir, process_seedwise_metrics, prepare_config
 from preprocess import DataModuleFromRaw
 from model import LightningPLM
 from test import test_plm
@@ -92,7 +92,7 @@ def _train_validate_plm(config, train_dl=None):
 
     return best_model_ckpt, metrics
 
-def _train_multi_seeds(config: OmegaConf, do_test: bool = False) -> None:
+def _run_multi_seeds(config: OmegaConf, do_test: bool = False) -> None:
     parent_logging_dir = config.logging_dir
     results = []
     for seed in config.seeds:
@@ -104,7 +104,7 @@ def _train_multi_seeds(config: OmegaConf, do_test: bool = False) -> None:
 
         best_model_ckpt, metrics = _train_validate_plm(config)
         
-        if do_test:
+        if do_test or metrics["val_pcc"] > 0.5 or metrics["val_ccc"] > 0.5:
             # subsequent testing
             log_info(logger, f"Testing right after training from {best_model_ckpt}")
             config.test_from_checkpoint = best_model_ckpt
@@ -118,12 +118,29 @@ def _train_multi_seeds(config: OmegaConf, do_test: bool = False) -> None:
     save_as = os.path.join(parent_logging_dir, "results.csv")
     process_seedwise_metrics(results, save_as)
 
+def _alpha_sweep(config: OmegaConf, do_test: bool) -> None:
+    alpha_range = np.arange(0, 6.5, 0.5)
+    parent_logging_dir = config.logging_dir
+
+    # if you want to run for a specific range of alpha, like, to resume
+    # alpha_range = np.arange(3.5, 6.5, 0.5)
+    # parent_logging_dir = "logs/20241030_091522_LLMGEm+2023-and-2022"
+
+    for alpha in alpha_range:
+        config.logging_dir = os.path.join(parent_logging_dir, f"alpha_{alpha}")
+        config.alpha = alpha.item() # converting to python float as numpy.float64 is not supported by OmegaConf
+        log_info(logger, f"Current alpha: {config.alpha}")
+        _run_multi_seeds(config, do_test)
+
 if __name__ == "__main__":
     transformers.logging.set_verbosity_error()
     config_train = OmegaConf.load("config/config_train.yaml")
     config_common = OmegaConf.load("config/config_common.yaml")
 
     config = OmegaConf.merge(config_common, config_train)
+
+    config = prepare_config(config)
+    import pdb; pdb.set_trace()
 
     if "updated_train_dl_file" in config:
         train_dl = torch.load(config.updated_train_dl_file, weights_only=False)
@@ -141,21 +158,29 @@ if __name__ == "__main__":
     config.logging_dir = resolve_logging_dir(config) # update customised logging_dir
     
     if config.main_label == "y":
-        _train_multi_seeds(config)
+        if not config.tune_hparams:
+            _run_multi_seeds(config, do_test=config.do_test)
+        else:
+            parent_logging_dir = config.logging_dir
+            for lr in config.lrs:
+                config.lr = lr
+                for batch_size in config.batch_sizes:
+                    config.batch_size = batch_size
+                    log_info(logger, f"Current lr: {config.lr}, Current batch_size: {config.batch_size}")
+                    config.logging_dir = os.path.join(parent_logging_dir, f"lr_{config.lr}_bs_{config.batch_size}")
+                    _run_multi_seeds(config, do_test=config.do_test)
     elif config.main_label == "y'":
         assert "llm_empathy" in config.extra_columns_to_keep_train, "llm_empathy must be included in extra_columns_to_keep_train"
-
-        alpha_range = np.arange(0, 6.5, 0.5)
-        parent_logging_dir = config.logging_dir
-
-        # if you want to run for a specific range of alpha, like to resume
-        # alpha_range = np.arange(3.5, 6.5, 0.5)
-        # parent_logging_dir = "logs/20241030_091522_LLMGEm+2023-and-2022"
-
-        for alpha in alpha_range:
-            config.logging_dir = os.path.join(parent_logging_dir, f"alpha_{alpha}")
-            config.alpha = alpha.item() # convertin to python float gas numpy.float64 is not supported by OmegaConf
-            log_info(logger, f"Current alpha: {config.alpha}")
-            _train_multi_seeds(config)
+        if not config.tune_hparams:
+            _alpha_sweep(config, do_test=config.do_test)
+        else:
+            parent_logging_dir = config.logging_dir
+            for lr in config.lrs:
+                config.lr = lr
+                for batch_size in config.batch_sizes:
+                    config.batch_size = batch_size
+                    log_info(logger, f"Current lr: {config.lr}, Current batch_size: {config.batch_size}")
+                    config.logging_dir = os.path.join(parent_logging_dir, f"lr_{config.lr}_bs_{config.batch_size}")
+                    _alpha_sweep(config, do_test=config.do_test)
     else:
         raise ValueError(f"main_label must be either y or y'. Found {config.main_label}")

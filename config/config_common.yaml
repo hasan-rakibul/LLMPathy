@@ -3,9 +3,14 @@ num_workers: 12
 plm: roberta-base
 # plm: siebert/sentiment-roberta-large-english
 
+tune_hparams: True
+
 num_epochs: 10
-lr: 2e-05
-batch_size: 16
+# lr: 2e-05
+lrs: [1e-5, 2e-5, 3e-5]
+# batch_size: 16
+batch_sizes: [16, 32]
+eval_batch_size: 32
 max_length: 512
 
 logging_dir: ./logs
@@ -28,15 +33,11 @@ linear_warmup: 0.06
 # plateau_threshold: 0.0057
 
 label_column: empathy
-# llm_column: llm_empathy
+llm_column: llm_empathy
 feature_to_tokenise: ["essay"]
 # feature_to_tokenise: ["demographic_essay"]
 # extra_columns_to_keep: ["article_id"]
 extra_columns_to_keep: []
-
-### extra column in train only
-# extra_columns_to_keep_train: []
-extra_columns_to_keep_train: ["llm_empathy"]
 
 # demographics: ['gender', 'education', 'race', 'age', 'income']
 # demographics_2024: ['person_id']

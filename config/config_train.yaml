@@ -1,15 +1,19 @@
 # boolean flags. No need to provide values
---debug_mode: # will run only 1 epoch of training with 1% of training data, saves logs in tmp/ directory
+# --debug_mode: # will run only 1 epoch of training with 1% of training data, saves logs in tmp/ directory
 
 do_test: False # whether to run subsequent test or not
-# test_file_list: ["data/NewsEmp2024/test_data_with_labels/goldstandard_EMP.csv"]
+# do_test: True
+save_predictions_to_disk: False # True or False
+
+expt_name: y'(2024,2022)-MultiHparam
+# expt_name: y(2024)+y_llm(2022)-MultiHparam
+# expt_name: baseline+2023+2022
 
 # main_label: y
 main_label: y' # means a sweep over alpha range
 
-# expt_name: LLMGEm+2023Llama-MultiOptuna
-expt_name: LLMGEm
-# expt_name: baseline+2023+2022
+train_data: [2024, 2022]
+train_only_llm_data: []
 
 # resume_train_from_checkpoint: logs/20241023_205914_vanilla+2023LLM/lightning_logs/version_17110004/checkpoints/epoch=5-step=378.ckpt
 # val_from_checkpoint:
@@ -17,29 +21,20 @@ expt_name: LLMGEm
 
 # updated_train_dl_file: ./logs/20241017_124809_Agentic-2022-2023-EssayDn/updated_train_dl.pt
 
-# train_file_list: ["data/NewsEmp2024/trac3_EMP_train.csv", "data/NewsEmp2022/messages_train_ready_for_WS.tsv", "./data/NewsEmp2023/WASSA23_essay_level_with_labels_train.tsv"]
-
-############ 2022 and 2023 ############
-# train_file_list: ["data/NewsEmp2022/messages_train_ready_for_WS_with_LLM.tsv", "./data/NewsEmp2023/WASSA23_essay_level_with_labels_train_with_LLM.tsv"]
-### for 2022 and 2023, we have separate gold standard files
-
-############ 2022 ############
-# train_file_list: ["data/NewsEmp2022/messages_train_ready_for_WS_with_LLM.tsv"]
-# val_file_list: ["data/NewsEmp2022/messages_dev_features_ready_for_WS_2022.tsv"]
-# val_goldstandard_file: data/NewsEmp2022/goldstandard_dev_2022.tsv
-
-############ 2023 ############
-# train_file_list: ["./data/NewsEmp2023/WASSA23_essay_level_with_labels_train_with_LLM.tsv"]
-# val_file_list: ["data/NewsEmp2023/WASSA23_essay_level_dev.tsv"]
-# val_goldstandard_file: data/NewsEmp2023/goldstandard_dev.tsv
-
-############ 2024 ############
-# train_file_list: ["data/NewsEmp2024/trac3_EMP_train.csv"]
-train_file_list: ["data/NewsEmp2024/trac3_EMP_train_llama.tsv"]
-val_file_list: ["data/NewsEmp2024/trac3_EMP_dev.csv"]
-
-# train_file_only_LLM_list: ["data/NewsEmp2023/WASSA23_essay_level_with_labels_train_llama.tsv", "data/NewsEmp2023/WASSA23_essay_level_dev_llama.tsv"]
-# train_file_only_LLM_list: ["data/NewsEmp2022/messages_train_ready_for_WS_llama.tsv", "data/NewsEmp2022/messages_dev_features_ready_for_WS_2022_llama.tsv"]
-
-# train_file_only_LLM_list: ["data/NewsEmp2023/WASSA23_essay_level_with_labels_train_gpt.tsv", "data/NewsEmp2023/WASSA23_essay_level_dev_gpt.tsv", "data/NewsEmp2022/messages_train_ready_for_WS_gpt.tsv", "data/NewsEmp2022/messages_dev_features_ready_for_WS_2022_gpt.tsv"]
-# train_file_only_LLM_list: ["data/NewsEmp2023/WASSA23_essay_level_with_labels_train_llama.tsv", "data/NewsEmp2023/WASSA23_essay_level_dev_llama.tsv", "data/NewsEmp2022/messages_train_ready_for_WS_llama.tsv", "data/NewsEmp2022/messages_dev_features_ready_for_WS_2022_llama.tsv"]
+# all file list that we can use for training / validation / testing
+2024:
+    train: data/NewsEmp2024/trac3_EMP_train.csv
+    train_llama: data/NewsEmp2024/trac3_EMP_train_llama.tsv
+    val: data/NewsEmp2024/trac3_EMP_dev.csv
+    val_llama: data/NewsEmp2024/trac3_EMP_dev_llama.csv
+    test: data/NewsEmp2024/test_data_with_labels/goldstandard_EMP.csv
+2023:
+    train: data/NewsEmp2023/WASSA23_essay_level_with_labels_train.tsv
+    train_llama: data/NewsEmp2023/WASSA23_essay_level_with_labels_train_llama.tsv
+    val: data/NewsEmp2023/WASSA23_essay_level_dev.tsv 
+    val_llama: data/NewsEmp2023/WASSA23_essay_level_dev_llama.tsv
+2022:
+    train: data/NewsEmp2022/messages_train_ready_for_WS.tsv
+    train_llama: data/NewsEmp2022/messages_train_ready_for_WS_llama.tsv
+    val: data/NewsEmp2022/messages_dev_features_ready_for_WS_2022.tsv
+    val_llama: data/NewsEmp2022/messages_dev_features_ready_for_WS_2022_llama.tsv

@@ -36,15 +36,15 @@ class DataModuleFromRaw:
         in place because pandas dataframes are mutable
 
         """
-        assert 'empathy' in data.columns, "empathy column not found in the data"
-        assert 'llm_empathy' in data.columns, "llm_empathy column not found in the data"
+        assert self.config.label_column in data.columns, f"{self.config.label_column} column not found in the data"
+        assert self.config.llm_column in data.columns, f"{self.config.llm_column} column not found in the data"
         # Calculate the absolute difference between 'empathy' and 'llm_empathy'
-        condition = np.abs(data['empathy'] - data['llm_empathy']) > self.config.alpha
+        condition = np.abs(data[self.config.label_column] - data[self.config.llm_column]) > self.config.alpha
         log_info(logger, f"Number of labels updated (crowdsourced labels --> LLM labels): {condition.sum()}")
         log_debug(logger, f"Replacing at indices: {data[condition].index.tolist()}")
 
         # Replace 'empathy' values where the condition is True
-        data.loc[condition, 'empathy'] = data.loc[condition, 'llm_empathy']
+        data.loc[condition, self.config.label_column] = data.loc[condition, self.config.llm_column]
     
     def _raw_to_processed(self, path: str, have_label: bool, mode: str) -> pd.DataFrame:
         log_info(logger, f"\nReading data from {path}")
@@ -76,9 +76,11 @@ class DataModuleFromRaw:
         if have_label:
             columns_to_keep.append(self.config.label_column)
         
-        if mode == "train" or mode == "train_only_LLM":
+        if mode == "train":
             columns_to_keep.extend(self.config.extra_columns_to_keep_train) # this is a list
-        
+        elif mode == "train_only_LLM":
+            columns_to_keep.append(self.config.llm_column) # this is a list
+
         selected_data = data[columns_to_keep]
 
         if "demographics" in self.config or "demographics_2024" in self.config:
@@ -106,7 +108,8 @@ class DataModuleFromRaw:
 
         if mode == "train_only_LLM":
             log_info(logger, f"Using only LLM labels of {path} file.\n")
-            selected_data = selected_data.rename(columns={'llm_empathy': self.config.label_column})
+            assert self.config.llm_column in selected_data.columns, f"LLM column {self.config.llm_column} not found in the data"
+            selected_data = selected_data.rename(columns={self.config.llm_column: self.config.label_column})
 
         return selected_data
 
@@ -142,6 +145,8 @@ class DataModuleFromRaw:
                 all_data = pd.concat([all_data, data])
 
         log_info(logger, f"Total number of {mode} samples: {len(all_data)}\n")
+        
+        assert all_data.isna().any().any() == False, "There are still NaN values in the data."
 
         # all_data.to_csv("tmp/all_data.tsv", sep='\t', index=False) # save the data for debugging
 
