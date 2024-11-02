@@ -29,7 +29,6 @@ def test_plm(config):
         max_epochs=1
     )
 
-
     with trainer.init_module(empty_init=True):
         model = LightningPLM.load_from_checkpoint(config.test_from_checkpoint)
 

@@ -8,10 +8,11 @@ save_predictions_to_disk: False # True or False
 # main_label: y
 main_label: y' # means a sweep over alpha range
 
-train_data: [2024, 2023, 2022]
-train_only_llm_data: [] # basically, y_llm
+train_data: [2024] # y or y'
+train_only_llm_data: [] # y_llm
 
 expt_name_postfix: MultiHparam # postfix to be added on top of main_label, train_data and train_only_llm_data
+# overwrite_logging_dir: logs/20241101_014137_y'(2024,2023,2022)-MultiHparam
 
 # resume_train_from_checkpoint: logs/20241023_205914_vanilla+2023LLM/lightning_logs/version_17110004/checkpoints/epoch=5-step=378.ckpt
 # val_from_checkpoint:

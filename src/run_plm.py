@@ -92,13 +92,17 @@ def _train_validate_plm(config, train_dl=None):
 
     return best_model_ckpt, metrics
 
-def _run_multi_seeds(config: OmegaConf, do_test: bool = False) -> None:
+def _seeds_sweep(config: OmegaConf, do_test: bool = False) -> None:
     parent_logging_dir = config.logging_dir
     results = []
     for seed in config.seeds:
         config.seed = seed
         log_info(logger, f"Current seed: {config.seed}")
         config.logging_dir = os.path.join(parent_logging_dir, f"seed_{config.seed}")
+
+        if os.path.exists(config.logging_dir):
+            log_info(logger, f"The logging directory already exists: {config.logging_dir}. So, skipping this seed {seed}.")
+            return
 
         L.seed_everything(config.seed)
 
@@ -122,15 +126,14 @@ def _alpha_sweep(config: OmegaConf, do_test: bool) -> None:
     alpha_range = np.arange(0, 6.5, 0.5)
     parent_logging_dir = config.logging_dir
 
-    # if you want to run for a specific range of alpha, like, to resume
-    # alpha_range = np.arange(3.5, 6.5, 0.5)
-    # parent_logging_dir = "logs/20241030_091522_LLMGEm+2023-and-2022"
-
     for alpha in alpha_range:
         config.logging_dir = os.path.join(parent_logging_dir, f"alpha_{alpha}")
         config.alpha = alpha.item() # converting to python float as numpy.float64 is not supported by OmegaConf
         log_info(logger, f"Current alpha: {config.alpha}")
-        _run_multi_seeds(config, do_test)
+        if os.path.exists(config.logging_dir):
+            log_info(logger, f"Skipping this alpha ({alpha}) as the logging directory already exists: {config.logging_dir}")
+            continue
+        _seeds_sweep(config, do_test)
 
 if __name__ == "__main__":
     transformers.logging.set_verbosity_error()
@@ -154,11 +157,15 @@ if __name__ == "__main__":
         config.logging_dir = "./tmp"
         log_info(logger, f"Debug mode is on. Using {config.logging_dir} for storing log files.")
     
-    config.logging_dir = resolve_logging_dir(config) # update customised logging_dir
+    if "overwrite_logging_dir" in config:
+        log_info(logger, f"Using overwrite_logging_dir {config.overwrite_logging_dir}")
+        config.logging_dir = config.overwrite_logging_dir
+    else:
+        config.logging_dir = resolve_logging_dir(config) # update customised logging_dir
     
     if config.main_label == "y":
         if not config.tune_hparams:
-            _run_multi_seeds(config, do_test=config.do_test)
+            _seeds_sweep(config, do_test=config.do_test)
         else:
             parent_logging_dir = config.logging_dir
             for lr in config.lrs:
@@ -167,9 +174,8 @@ if __name__ == "__main__":
                     config.batch_size = batch_size
                     log_info(logger, f"Current lr: {config.lr}, Current batch_size: {config.batch_size}")
                     config.logging_dir = os.path.join(parent_logging_dir, f"lr_{config.lr}_bs_{config.batch_size}")
-                    _run_multi_seeds(config, do_test=config.do_test)
+                    _seeds_sweep(config, do_test=config.do_test)
     elif config.main_label == "y'":
-        assert "llm_empathy" in config.extra_columns_to_keep_train, "llm_empathy must be included in extra_columns_to_keep_train"
         if not config.tune_hparams:
             _alpha_sweep(config, do_test=config.do_test)
         else:
