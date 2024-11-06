@@ -19,7 +19,7 @@ def _submission_ready(save_dir: str) -> None:
         zf.write(f"{save_dir}/test-predictions_EMP.tsv", arcname="predictions_EMP.tsv")
         log_info(logger, f"Zipped predictions to {save_dir}/predictions.zip")
 
-def test_plm(config):
+def test_plm(config: OmegaConf, make_ready_for_submission: bool = False, have_label: bool = True) -> dict:
     assert os.path.exists(config.test_from_checkpoint), "valid test_from_checkpoint is required for test_mode"
     
     datamodule = DataModuleFromRaw(config)
@@ -34,28 +34,30 @@ def test_plm(config):
 
     log_info(logger, f"Loaded model from {config.test_from_checkpoint}")
     
-    if "2024" in config.test_file_list[0]:
-        test_dl = datamodule.get_test_dl(data_path_list=config.test_file_list, have_label=True)
-    else:
-        test_dl = datamodule.get_test_dl(data_path_list=config.test_file_list)
-    
+    test_dl = datamodule.get_test_dl(data_path_list=config.test_file_list, have_label=have_label)
+
     # modified setting from config do not work because we are loading a checkpoint with this value being False
     model.config.save_predictions_to_disk = config.save_predictions_to_disk
     model.config.logging_dir = config.logging_dir
 
     trainer.test(model=model, dataloaders=test_dl, verbose=True)
 
-    if "--submission_ready" in config:
+    if make_ready_for_submission:
         _submission_ready(save_dir=config.logging_dir)
 
-    metrics = {
-        "test_pcc": trainer.callback_metrics["test_pcc"].item(),
-        "test_ccc": trainer.callback_metrics["test_ccc"].item(),
-        "test_rmse": trainer.callback_metrics["test_rmse"].item()
-    }
+    if have_label:
+        # metrics calculation is possibel only if we have labels
+        metrics = {
+            "test_pcc": trainer.callback_metrics["test_pcc"].item(),
+            "test_ccc": trainer.callback_metrics["test_ccc"].item(),
+            "test_rmse": trainer.callback_metrics["test_rmse"].item()
+        }
+    else:
+        metrics = {}
+
     return metrics
 
-def _test_multi_seeds(ckpt_parent_dir: str, config: OmegaConf) -> None:
+def _test_multi_seeds(ckpt_parent_dir: str, config: OmegaConf, make_ready_for_submission: bool = False, have_label: bool = True) -> None:
     results = []
 
     for seed in config.seeds:
@@ -63,7 +65,7 @@ def _test_multi_seeds(ckpt_parent_dir: str, config: OmegaConf) -> None:
         log_info(logger, f"Current seed: {config.seed}")
         config.test_from_checkpoint = resolve_seed_wise_checkpoint(ckpt_parent_dir, seed)
         config.logging_dir = ckpt_parent_dir
-        test_metrics = test_plm(config)
+        test_metrics = test_plm(config, make_ready_for_submission, have_label)
         test_metrics["seed"] = seed
         log_info(logger, f"Metrics: {test_metrics}")
         results.append(test_metrics)
@@ -110,16 +112,24 @@ if __name__ == "__main__":
     config = OmegaConf.merge(config_common, config_test)
 
     config.batch_size = config.eval_batch_size
+    config.test_file_list = []
+    make_ready_for_submission = False
+    have_label = True
+    for data in config.test_data:
+        config.test_file_list.append(config[data].test)
+        if data in [2023, 2022]:
+            # only way to test is through CodaLab submission
+            make_ready_for_submission = True
+            have_label = False
     
     if "test_from_checkpoint" in config:
-        log_info(logger, f"Doing a single test using {config.test_file_list}")
-        L.seed_everything(config.seed)
+        log_info(logger, f"Doing a single test using {config.test_from_checkpoint}")
         log_info(logger, f"Normal testing on {config.test_file_list}")
         config.logging_dir = resolve_logging_dir(config) # update customised logging_dir
-        test_plm(config)
+        test_plm(config, make_ready_for_submission, have_label)
     elif "test_from_ckpts_parent_dir" in config:
         log_info(logger, f"Multi-seed testing from {config.test_from_ckpts_parent_dir}")
-        _test_multi_seeds(config.test_from_ckpts_parent_dir, config)
+        _test_multi_seeds(config.test_from_ckpts_parent_dir, config, make_ready_for_submission)
     elif "test_zero_shot_file" in config:
         log_info(logger, f"Zero shot testing on {config.test_zero_shot_file}")
         if "val_goldstandard_file" in config:

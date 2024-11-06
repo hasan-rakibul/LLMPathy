@@ -6,7 +6,7 @@ import lightning as L
 from omegaconf import OmegaConf
 import numpy as np
 
-from utils import log_info, get_trainer, resolve_logging_dir, process_seedwise_metrics, prepare_config
+from utils import log_info, get_trainer, resolve_logging_dir, process_seedwise_metrics, prepare_train_config
 from preprocess import DataModuleFromRaw
 from model import LightningPLM
 from test import test_plm
@@ -18,7 +18,7 @@ def _train_validate_plm(config, train_dl=None):
     
     val_dl = datamodule.get_val_dl(data_path_list=config.val_file_list)
 
-    trainer = get_trainer(config)
+    trainer = get_trainer(config, enable_early_stopping=True)
     if train_dl is None:
         train_dl = datamodule.get_train_dl(data_path_list=config.train_file_list)
 
@@ -52,11 +52,13 @@ def _train_validate_plm(config, train_dl=None):
         )
     elif "finetune_from_checkpoint" in config:
         log_info(logger, f"Fine-tuning from {config.finetune_from_checkpoint}")
-        assert "alpha" not in config, "alpha should not be provided for fine-tuning"
-        assert "train_file_only_LLM_list" not in config, "train_file_only_LLM_list should not be provided for fine-tuning"
         with trainer.init_module(empty_init=True):
             model = LightningPLM.load_from_checkpoint(config.finetune_from_checkpoint)
-        
+
+        log_info(logger, f"Updating the learning rate {model.learning_rate} to {config.lr}")
+        model.learning_rate = config.lr
+        model.configure_optimizers() # update the optimiser with the new learning rate, not sure if this is required, but just in case
+
         trainer.fit(
             model=model,
             train_dataloaders=train_dl,
@@ -108,7 +110,7 @@ def _seeds_sweep(config: OmegaConf, do_test: bool = False) -> None:
 
         best_model_ckpt, metrics = _train_validate_plm(config)
         
-        if do_test or metrics["val_pcc"] > 0.5 or metrics["val_ccc"] > 0.5:
+        if do_test:
             # subsequent testing
             log_info(logger, f"Testing right after training from {best_model_ckpt}")
             config.test_from_checkpoint = best_model_ckpt
@@ -142,7 +144,7 @@ if __name__ == "__main__":
 
     config = OmegaConf.merge(config_common, config_train)
 
-    config = prepare_config(config)
+    config = prepare_train_config(config)
 
     if "updated_train_dl_file" in config:
         train_dl = torch.load(config.updated_train_dl_file, weights_only=False)
@@ -151,7 +153,7 @@ if __name__ == "__main__":
         config.logging_dir = os.path.dirname(config.updated_train_dl_file)
         _ = _train_validate_plm(config, train_dl)
 
-    if "--debug_mode" in config:
+    if config.debug_mode:
         logger.setLevel(logging.DEBUG)
         config.seeds = config.seeds[:2] # reduce the number of seeds for debugging
         config.logging_dir = "./tmp"
@@ -165,6 +167,8 @@ if __name__ == "__main__":
     
     if config.main_label == "y":
         if not config.tune_hparams:
+            config.lr = config.tuned_lr
+            config.batch_size = config.tuned_batch_size
             _seeds_sweep(config, do_test=config.do_test)
         else:
             parent_logging_dir = config.logging_dir
@@ -177,7 +181,10 @@ if __name__ == "__main__":
                     _seeds_sweep(config, do_test=config.do_test)
     elif config.main_label == "y'":
         if not config.tune_hparams:
-            _alpha_sweep(config, do_test=config.do_test)
+            config.lr = config.tuned_lr
+            config.batch_size = config.tuned_batch_size
+            config.alpha = config.tuned_alpha
+            _seeds_sweep(config, do_test=config.do_test)
         else:
             parent_logging_dir = config.logging_dir
             for lr in config.lrs:

@@ -1,19 +1,22 @@
 # python 3.12.3
 transformers >= 4.43.0
 datasets
+lightning
 tensorboard
+torch-tb-profiler # for tensorboard profiling
 pandas
-numpy
 matplotlib
 scienceplots
 omegaconf
+ipykernel # for jupyter notebook
+scipy
 
 # for Optuna hyperparameter optimisation
-optuna
-optuna-integration[pytorch-lightning]
-plotly # for visualisation
-kaleido # for visualisation
-scikit-learn # for calculation in visualisation
+#optuna
+#optuna-integration[pytorch-lightning]
+#plotly # for visualisation
+#kaleido # for visualisation
+#scikit-learn # for calculation in visualisation
 
 ## LoRA
 # sentencepiece

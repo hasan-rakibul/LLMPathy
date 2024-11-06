@@ -36,7 +36,7 @@ def read_file(file_path: str) -> pd.DataFrame:
         raise ValueError(f"File extension not supported: {file_path}")
     return df
 
-def get_trainer(config, devices="auto", extra_callbacks=None, enable_checkpointing=True):
+def get_trainer(config, devices="auto", extra_callbacks=None, enable_checkpointing=True, enable_early_stopping=True):
     """
     By default, we have EarlyStopping.
     ModelCheckpoint is enabled if enable_checkpointing is True.
@@ -50,16 +50,19 @@ def get_trainer(config, devices="auto", extra_callbacks=None, enable_checkpointi
     # )
     # maybe val_pcc is not a good idea as pcc is not correlated beween val and test
 
-    early_stopping = EarlyStopping(
-        monitor="val_loss",
-        patience=3,
-        mode="min",
-        min_delta=0.001
-    )
+    
     callbacks = []
     
-    callbacks.append(early_stopping)
-    # log_info(logger, "Early stopping disabled")
+    if enable_early_stopping:
+        early_stopping = EarlyStopping(
+            monitor="val_loss",
+            patience=2,
+            mode="min",
+            min_delta=0.01
+        )
+        callbacks.append(early_stopping)
+    else:
+        log_info(logger, "Early stopping disabled")
     
     if enable_checkpointing:
         # have a ModelCheckpoint callback
@@ -84,7 +87,7 @@ def get_trainer(config, devices="auto", extra_callbacks=None, enable_checkpointi
     callbacks.extend(extra_callbacks) if extra_callbacks else None
 
     trainer = L.Trainer(
-        max_epochs=1 if "--debug_mode" in config else config.num_epochs,
+        max_epochs=1 if config.debug_mode else config.num_epochs,
         default_root_dir=config.logging_dir,
         deterministic=True,
         logger=True,
@@ -92,7 +95,7 @@ def get_trainer(config, devices="auto", extra_callbacks=None, enable_checkpointi
         callbacks=callbacks,
         devices=devices,
         enable_checkpointing=enable_checkpointing,
-        limit_train_batches=0.1 if "--debug_mode" in config else 1.0,
+        limit_train_batches=0.1 if config.debug_mode else 1.0,
     )
 
     return trainer
@@ -177,7 +180,7 @@ def plot(x, y, y2=None, xlabel=None, ylabel=None, legend=[], save=False, filenam
         
     fig.show()
 
-def prepare_config(config: OmegaConf) -> OmegaConf:
+def prepare_train_config(config: OmegaConf) -> OmegaConf:
 
     config.expt_name = f"{config.main_label}({','.join([str(data) for data in config.train_data])})"
     if len(config.train_only_llm_data) > 0:

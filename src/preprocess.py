@@ -9,7 +9,6 @@ from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, DataCollatorWithPadding
 from datasets import Dataset
 import logging
-from sklearn.preprocessing import MinMaxScaler
 
 from utils import log_info, log_debug, read_file
 
@@ -28,6 +27,8 @@ class DataModuleFromRaw:
             
         self.data_collator = DataCollatorWithPadding(tokenizer=self.tokeniser)
 
+        if "demographics" in self.config or "demographics_2024" in self.config:
+            from sklearn.preprocessing import MinMaxScaler
 
     def label_fix_inplace(self, data: pd.DataFrame) -> None:
         """
@@ -137,7 +138,7 @@ class DataModuleFromRaw:
             else:
                 all_data = data
         
-        if "train_file_only_LLM_list" in self.config and mode == "train":
+        if mode == "train":
             # add the train_file_only_LLM_list
             for data_path in self.config.train_file_only_LLM_list:
                 # assuming no have_label, as we are using LLM labels as the main labels
@@ -147,12 +148,12 @@ class DataModuleFromRaw:
         log_info(logger, f"Total number of {mode} samples: {len(all_data)}\n")
         
         assert all_data.isna().any().any() == False, "There are still NaN values in the data."
+        assert all_data.isnull().any().any() == False, "The are still null values in the data"
 
         # all_data.to_csv("tmp/all_data.tsv", sep='\t', index=False) # save the data for debugging
 
         # add sample_id column
         # all_data['sample_id'] = range(len(all_data))     
-        
         all_data_hf = Dataset.from_pandas(all_data, preserve_index=False) # convert to huggingface dataset
         
         # tokenise
@@ -174,6 +175,11 @@ class DataModuleFromRaw:
         random.seed(worker_seed) 
     
     def _get_dl(self, data_path_list, have_label, shuffle, mode):
+
+        if mode == "test" and "seed" not in self.config:
+            # typically, seed should not matter in test and we may not have it in the config
+            self.config.seed = 0
+
         # making sure the shuffling is reproducible
         g = torch.Generator()
         g.manual_seed(self.config.seed)

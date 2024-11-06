@@ -1,8 +1,6 @@
-# boolean flags. No need to provide values
-# --debug_mode: # will run only 1 epoch of training with 1% of training data, saves logs in tmp/ directory
+debug_mode: False # will run only 1 epoch of training with 1% of training data, saves logs in tmp/ directory
 
-do_test: False # whether to run subsequent test or not
-# do_test: True
+do_test: True # whether to run subsequent test or not; required after hyperparameter tuning
 save_predictions_to_disk: False # True or False
 
 # main_label: y
@@ -11,12 +9,12 @@ main_label: y' # means a sweep over alpha range
 train_data: [2024] # y or y'
 train_only_llm_data: [] # y_llm
 
-expt_name_postfix: MultiHparam # postfix to be added on top of main_label, train_data and train_only_llm_data
-# overwrite_logging_dir: logs/20241101_014137_y'(2024,2023,2022)-MultiHparam
+expt_name_postfix: SelectedHparam # postfix to be added on top of main_label, train_data and train_only_llm_data
+# overwrite_logging_dir: logs/20241031_233816_y'(2024,2022)-MultiHparam 
 
 # resume_train_from_checkpoint: logs/20241023_205914_vanilla+2023LLM/lightning_logs/version_17110004/checkpoints/epoch=5-step=378.ckpt
-# val_from_checkpoint:
-# finetune_from_checkpoint: logs/20241023_213441_LLMGEm+2023LLM/lightning_logs/version_17195570/checkpoints/epoch=19-step=1260.ckpt
+
+# finetune_from_checkpoint: logs/20241101_014137_y'(2024,2023,2022)-MultiHparam/lr_3e-05_bs_16/alpha_4.5/seed_42/lightning_logs/version_17961088/checkpoints/epoch=9-step=2590.ckpt 
 
 # updated_train_dl_file: ./logs/20241017_124809_Agentic-2022-2023-EssayDn/updated_train_dl.pt
 
@@ -37,3 +35,4 @@ expt_name_postfix: MultiHparam # postfix to be added on top of main_label, train
     train_llama: data/NewsEmp2022/messages_train_ready_for_WS_llama.tsv
     val: data/NewsEmp2022/messages_dev_features_ready_for_WS_2022.tsv
     val_llama: data/NewsEmp2022/messages_dev_features_ready_for_WS_2022_llama.tsv
+    

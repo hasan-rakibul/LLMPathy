@@ -3,13 +3,16 @@ num_workers: 12
 plm: roberta-base
 # plm: siebert/sentiment-roberta-large-english
 
-tune_hparams: True
+# tune_hparams: True
+# lrs: [1.0e-5, 2.0e-5, 3.0e-5, 5.0e-5, 1.0e-6]
+# batch_sizes: [16, 32]
+
+tune_hparams: False
+tuned_lr: 3.0e-05
+tuned_batch_size: 16
+tuned_alpha: 4.5
 
 num_epochs: 10
-# lr: 2e-05
-lrs: [1e-5, 2e-5, 3e-5]
-batch_sizes: [16, 32]
-# batch_size: 16
 eval_batch_size: 32
 max_length: 512
 
@@ -20,7 +23,7 @@ lr_find: False  # unfornately, it didn't work for me
 
 adamw_beta1: 0.9
 adamw_beta2: 0.98
-adamw_eps: 1e-06
+adamw_eps: 1.0e-06
 adamw_weight_decay: 0.1
 
 lr_scheduler_type: linear
