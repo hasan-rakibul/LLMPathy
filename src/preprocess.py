@@ -2,9 +2,11 @@ import random
 import numpy as np
 import pandas as pd
 import os
+from typing import List, Dict
 
 import torch
 from torch.utils.data import DataLoader
+from sklearn.preprocessing import MinMaxScaler
 
 from transformers import AutoTokenizer, DataCollatorWithPadding
 from datasets import Dataset
@@ -27,10 +29,7 @@ class DataModuleFromRaw:
             
         self.data_collator = DataCollatorWithPadding(tokenizer=self.tokeniser)
 
-        if "demographics" in self.config or "demographics_2024" in self.config:
-            from sklearn.preprocessing import MinMaxScaler
-
-    def label_fix_inplace(self, data: pd.DataFrame) -> None:
+    def _label_fix_inplace(self, data: pd.DataFrame) -> None:
         """
         Replace 'empathy' values with 'llm_empathy' if their difference exceeds the threshold 'alpha'.
 
@@ -46,6 +45,20 @@ class DataModuleFromRaw:
 
         # Replace 'empathy' values where the condition is True
         data.loc[condition, self.config.label_column] = data.loc[condition, self.config.llm_column]
+    
+    def _one_hot_encode_demog(self, data: pd.DataFrame, categorical_features: List, possible_categories: Dict) -> pd.DataFrame:
+        encoded_data = pd.get_dummies(data, columns=categorical_features, prefix=categorical_features)
+
+        # ensure that all possible categories are present in the encoded data
+        for col in categorical_features:
+            for cat in possible_categories[col]:
+                if f"{col}_{cat}" not in encoded_data.columns:
+                    encoded_data[f"{col}_{cat}"] = 0
+
+        one_hot_columns = [f"{col}_{cat}" for col in categorical_features for cat in possible_categories[col]]
+        only_encoded_features = encoded_data[one_hot_columns]
+        only_encoded_features = only_encoded_features.astype(int)
+        return only_encoded_features
     
     def _raw_to_processed(self, path: str, have_label: bool, mode: str) -> pd.DataFrame:
         log_info(logger, f"\nReading data from {path}")
@@ -84,18 +97,49 @@ class DataModuleFromRaw:
 
         selected_data = data[columns_to_keep]
 
-        if "demographics" in self.config or "demographics_2024" in self.config:
-            if "2024" in path:
-                self.config.demographics = self.config.demographics_2024
+        if self.config.use_demographics:
+            log_info(logger, f"Using demographics data.")
+
+            continous_features = ["age", "income"]
+            categorical_features = ["gender", "education", "race"]
+            demog_columns = continous_features + categorical_features
+     
+            if "2024" in path: # volatile check, depending on the dir/file name
+                # require mapping for 2024 demographics
+                # demographics mapping are available from PER dataset
+                per_train = pd.read_csv("data/NewsEmp2024/demographic-from-PER-task/trac4_PER_train.csv", index_col=0)
+                per_dev = pd.read_csv("data/NewsEmp2024/demographic-from-PER-task/trac4_PER_dev.csv", index_col=0)
+                per_test = pd.read_csv("data/NewsEmp2024/demographic-from-PER-task/goldstandard_PER.csv", index_col=None)
+                assert per_train.columns.to_list() == per_dev.columns.to_list() == per_test.columns.to_list()
+                
+                demog_map = pd.concat([per_train, per_dev, per_test], ignore_index=True)
+                demog_map.drop_duplicates(subset=['person_id'], inplace=True)
+                
+                data["person_id"] = data["person_id"].astype(str) # for merging
+                demog_map["person_id"] = demog_map["person_id"].astype(str) # for merging
+
+                only_demog_map = demog_map[['person_id'] + demog_columns] # person_id is important for mapping
+                data = pd.merge(data, only_demog_map, on='person_id', how='left', validate='many_to_one')
+
+            assert set(demog_columns).issubset(data.columns), f"Demographics columns {demog_columns} not found in the data"
             
+            possible_categories = {
+                'gender': [1, 2, 5],
+                'education': [1, 2, 3, 4, 5, 6, 7],
+                'race': [1, 2, 3, 4, 5, 6]
+            }
+            categorical_demog = data[categorical_features]
+            one_hot_encoded_data = self._one_hot_encode_demog(categorical_demog, categorical_features, possible_categories)
+
+            continous_data = data[continous_features]
             scaler = MinMaxScaler()
-            numeric_data = data[self.config.demographics]
-            numeric_data = pd.DataFrame(
-                scaler.fit_transform(numeric_data),
-                columns=self.config.demographics
+            scaled_data = pd.DataFrame(
+                scaler.fit_transform(continous_data),
+                columns=continous_features
             )
-            selected_data = pd.concat([selected_data, numeric_data], axis=1)
- 
+
+            selected_data = pd.concat([selected_data, one_hot_encoded_data, scaled_data], axis=1)
+
         log_info(logger, f"Columns with NaN values: {selected_data.columns[selected_data.isna().any()].tolist()}")
         selected_data = selected_data.dropna() # drop NaN values
         log_info(logger, f"Removed NaN values if existed. {len(selected_data)} samples remaining.\n")
@@ -105,7 +149,7 @@ class DataModuleFromRaw:
 
         if mode == "train" and "alpha" in self.config:
             log_info(logger, f"Updating labels of {path} file.\n")
-            self.label_fix_inplace(selected_data)
+            self._label_fix_inplace(selected_data)
 
         if mode == "train_only_LLM":
             log_info(logger, f"Using only LLM labels of {path} file.\n")
