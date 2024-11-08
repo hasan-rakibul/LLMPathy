@@ -6,12 +6,14 @@ import lightning as L
 from omegaconf import OmegaConf
 import numpy as np
 
-from utils import log_info, get_trainer, resolve_logging_dir, process_seedwise_metrics, prepare_train_config
+from utils import log_info, resolve_logging_dir, process_seedwise_metrics, prepare_train_config
+
+from model_and_trainer import init_model, load_model_from_ckpt, get_trainer
 from preprocess import DataModuleFromRaw
-from model import LightningPLM
 from test import test_plm
 
 logger = logging.getLogger(__name__)
+
 
 def _train_validate_plm(config, train_dl=None):
     datamodule = DataModuleFromRaw(config)
@@ -42,7 +44,7 @@ def _train_validate_plm(config, train_dl=None):
         # https://lightning.ai/docs/pytorch/stable/advanced/model_init.html
         with trainer.init_module():
             # model created here directly goes to GPU
-            model = LightningPLM(config)
+            model = init_model(config)
 
         trainer.fit(
             model=model,
@@ -53,7 +55,7 @@ def _train_validate_plm(config, train_dl=None):
     elif "finetune_from_checkpoint" in config:
         log_info(logger, f"Fine-tuning from {config.finetune_from_checkpoint}")
         with trainer.init_module(empty_init=True):
-            model = LightningPLM.load_from_checkpoint(config.finetune_from_checkpoint)
+            model = load_model_from_ckpt(config, config.finetune_from_checkpoint)
 
         log_info(logger, f"Updating the learning rate {model.learning_rate} to {config.lr}")
         model.learning_rate = config.lr
@@ -69,7 +71,7 @@ def _train_validate_plm(config, train_dl=None):
         # https://lightning.ai/docs/pytorch/stable/advanced/model_init.html
         with trainer.init_module():
             # model created here directly goes to GPU
-            model = LightningPLM(config)
+            model = init_model(config) 
         trainer.fit(
             model=model,
             train_dataloaders=train_dl,
@@ -81,7 +83,7 @@ def _train_validate_plm(config, train_dl=None):
     # final validation at the end of training
     log_info(logger, f"Loading the best model from {best_model_ckpt}")
     with trainer.init_module(empty_init=True):
-        model = LightningPLM.load_from_checkpoint(best_model_ckpt)
+        model = load_model_from_ckpt(config, best_model_ckpt)
 
     # model.config.save_predictions_to_disk = True # save final predictions to disk
     trainer.validate(model=model, dataloaders=val_dl)

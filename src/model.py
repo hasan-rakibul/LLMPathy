@@ -7,86 +7,23 @@ import os
 import logging
 import pandas as pd
 import torch.nn as nn
+from omegaconf import OmegaConf
 from utils import log_info
 
 logger = logging.getLogger(__name__)
-
-# taken and modified from our LLM-GEm work
-class RoBERTaFusionFC(nn.Module):
-    def __init__(self, config):
-        super().__init__()
-
-        self.config = config
-        fc_arch = self.config.fc_arch
-
-        self.transformer = AutoModelForSequenceClassification.from_pretrained(
-            pretrained_model_name_or_path=self.config.plm,
-            num_labels=fc_arch[0]
-        )
-
-        if config.freeze_plm:
-            log_info(logger, "Freezing the PLM weights")
-            for param in self.transformer.roberta.parameters():
-                param.requires_grad = False
-        
-        # pre-fusion layer
-        self.pre_fusion = nn.Sequential(
-            nn.Tanh(), # as transformer outputs logits
-            nn.Dropout(0.4),
-            nn.Linear(fc_arch[0], fc_arch[1]),
-            nn.Tanh(),
-            nn.Dropout(0.3)
-        )
-
-        # fusion layer
-        fusion_input_dim = fc_arch[-3] + len(config.demographics)
-        self.fusion = nn.Sequential(
-            nn.Linear(fusion_input_dim, fc_arch[-2]),
-            nn.Tanh(),
-            nn.Dropout(0.2)
-        )
-
-        # output layer
-        self.output = nn.Linear(fc_arch[-2], fc_arch[-1])
-
-    def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        demographic_vector=None
-    ):
-
-        x = self.transformer(
-            input_ids= input_ids,
-            attention_mask=attention_mask,
-        )
-        x = x.logits # shape: (batch_size, num_labels)
-        
-        x = self.pre_fusion(x)
-        
-        if demographic_vector is not None:
-            x = torch.cat([x, demographic_vector], 1)        
-        
-        x = self.fusion(x)
-        x = self.output(x)
-        return x.squeeze(-1) # remove the last dimension
     
 class LightningPLM(L.LightningModule):
-    def __init__(self, config):
+    def __init__(self, config: OmegaConf):
         super().__init__()
         self.save_hyperparameters()
         self.config = config
         self.learning_rate = self.config.lr # separate for lr tuning by lightning
 
-        if "fc_arch" in self.config:
-            raise NotImplementedError("FusionFC forward is commented out")
-            self.model = RoBERTaFusionFC(self.config)
-        else:
-            self.model = AutoModelForSequenceClassification.from_pretrained(
-                pretrained_model_name_or_path=self.config.plm,
-                num_labels=1,
-                # ignore_mismatched_sizes=True # SieBERT has 2 output labels so we ignore mismatched sizes
-            )
+        self.model = AutoModelForSequenceClassification.from_pretrained(
+            pretrained_model_name_or_path=self.config.plm,
+            num_labels=1,
+            # ignore_mismatched_sizes=True # SieBERT has 2 output labels so we ignore mismatched sizes
+        )
 
         self.training_step_outputs = []
         self.training_step_labels = []
@@ -94,20 +31,6 @@ class LightningPLM(L.LightningModule):
         self.validation_step_labels = []
         self.test_step_outputs = []
         self.test_step_labels = []
-    
-    # def forward_roberta_fusion_fc(self, batch):
-    #     if len(self.config.demographics) > 0:
-    #         demographic_vector = torch.cat(
-    #             [batch[col].unsqueeze(1) for col in self.config.demographics], dim=1
-    #         ) # shape: (batch_size, num_demographics)
-    #     else:
-    #         demographic_vector = None
-            
-    #     return self.model(
-    #         input_ids=batch['input_ids'],
-    #         attention_mask=batch['attention_mask'],
-    #         demographic_vector=demographic_vector
-    #     )
 
     def forward(self, batch):
         output = self.model(
@@ -153,13 +76,6 @@ class LightningPLM(L.LightningModule):
                 'frequency': 1
             }
         }
-    
-    def _outputs_from_batch(self, batch):
-        outputs = self(
-            input_ids=batch['input_ids'],
-            attention_mask=batch['attention_mask']
-        )
-        return outputs
     
     @rank_zero_only
     def _calc_save_predictions(self, preds, mode='test'):
@@ -309,3 +225,87 @@ class LightningPLM(L.LightningModule):
 
         self.test_step_outputs.clear()
         self.test_step_labels.clear()
+
+
+# taken and modified from our LLM-GEm work
+class RoBERTaFusionFC(nn.Module):
+    def __init__(self, config: OmegaConf, num_demographics: int = 18):
+        super().__init__()
+
+        self.config = config
+        fc_arch = self.config.fc_arch
+
+        self.transformer = AutoModelForSequenceClassification.from_pretrained(
+            pretrained_model_name_or_path=self.config.plm,
+            num_labels=fc_arch[0]
+        )
+
+        if config.freeze_plm:
+            log_info(logger, "Freezing the PLM weights")
+            for param in self.transformer.roberta.parameters():
+                param.requires_grad = False
+        
+        # pre-fusion layer
+        self.pre_fusion = nn.Sequential(
+            nn.Tanh(), # as transformer outputs logits
+            nn.Dropout(0.4),
+            nn.Linear(fc_arch[0], fc_arch[1]),
+            nn.Tanh(),
+            nn.Dropout(0.3)
+        )
+
+        # fusion layer
+        fusion_input_dim = fc_arch[-3] + num_demographics
+        self.fusion = nn.Sequential(
+            nn.Linear(fusion_input_dim, fc_arch[-2]),
+            nn.Tanh(),
+            nn.Dropout(0.2)
+        )
+
+        # output layer
+        self.output = nn.Linear(fc_arch[-2], fc_arch[-1])
+
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        demographic_vector=None
+    ):
+
+        x = self.transformer(
+            input_ids= input_ids,
+            attention_mask=attention_mask,
+        )
+        x = x.logits # shape: (batch_size, num_labels)
+        
+        x = self.pre_fusion(x)
+        
+        if demographic_vector is not None:
+            x = torch.cat([x, demographic_vector], 1)        
+        
+        x = self.fusion(x)
+        x = self.output(x)
+        return x.squeeze(-1) # remove the last dimension
+    
+class LightningPLMFC(LightningPLM):
+    def __init__(self, config: OmegaConf):
+        super().__init__(config)
+
+        self.demographic_features = ["gender_" + str(i) for i in range(1, 3)] + ["gender_5"] + \
+            ["education_" + str(i) for i in range(1, 8)] + \
+            ["race_" + str(i) for i in range(1, 7)] + \
+            ["age", "income"]
+        
+        self.model = RoBERTaFusionFC(self.config, num_demographics=len(self.demographic_features))
+        
+    def forward(self, batch):
+        # assuming columns except 'input_ids', 'attention_mask' and 'labels' are demographic features
+        demographic_vector = torch.cat(
+            [batch[col].unsqueeze(1) for col in self.demographic_features], dim=1
+        ) # shape: (batch_size, num_demographics)
+        return self.model(
+            input_ids=batch['input_ids'],
+            attention_mask=batch['attention_mask'],
+            demographic_vector=demographic_vector
+        )
+    

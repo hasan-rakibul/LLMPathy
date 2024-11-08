@@ -16,6 +16,8 @@ from utils import log_info, log_debug, read_file
 
 logger = logging.getLogger(__name__)
 
+pd.options.mode.copy_on_write = True # https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+
 class DataModuleFromRaw:
     def __init__(self, config):
 
@@ -45,9 +47,15 @@ class DataModuleFromRaw:
 
         # Replace 'empathy' values where the condition is True
         data.loc[condition, self.config.label_column] = data.loc[condition, self.config.llm_column]
+
+        data.drop(columns=[self.config.llm_column], inplace=True)
     
-    def _one_hot_encode_demog(self, data: pd.DataFrame, categorical_features: List, possible_categories: Dict) -> pd.DataFrame:
-        encoded_data = pd.get_dummies(data, columns=categorical_features, prefix=categorical_features)
+    def _one_hot_encode_demog(self, categorical_data: pd.DataFrame, categorical_features: List, possible_categories: Dict) -> pd.DataFrame:
+        assert set(categorical_features) == set(categorical_data.columns), f"Categorical data columns {categorical_data.columns} do not perfectly match with the categorical features {categorical_features}"
+        
+        categorical_data = categorical_data.astype(int)
+        
+        encoded_data = pd.get_dummies(categorical_data, columns=categorical_features, prefix=categorical_features)
 
         # ensure that all possible categories are present in the encoded data
         for col in categorical_features:
@@ -55,10 +63,8 @@ class DataModuleFromRaw:
                 if f"{col}_{cat}" not in encoded_data.columns:
                     encoded_data[f"{col}_{cat}"] = 0
 
-        one_hot_columns = [f"{col}_{cat}" for col in categorical_features for cat in possible_categories[col]]
-        only_encoded_features = encoded_data[one_hot_columns]
-        only_encoded_features = only_encoded_features.astype(int)
-        return only_encoded_features
+        encoded_data = encoded_data.astype(int)
+        return encoded_data
     
     def _raw_to_processed(self, path: str, have_label: bool, mode: str) -> pd.DataFrame:
         log_info(logger, f"\nReading data from {path}")
@@ -92,11 +98,15 @@ class DataModuleFromRaw:
         
         if mode == "train":
             columns_to_keep.extend(self.config.extra_columns_to_keep_train) # this is a list
-        elif mode == "train_only_LLM":
-            columns_to_keep.append(self.config.llm_column) # this is a list
+        
+        if mode == "train_only_LLM":
+            if self.config.label_column in data.columns:
+                data.drop(columns=[self.config.label_column], inplace=True) # remove the label column
+            data.rename(columns={self.config.llm_column: self.config.label_column}, inplace=True)
 
         selected_data = data[columns_to_keep]
 
+        
         if self.config.use_demographics:
             log_info(logger, f"Using demographics data.")
 
@@ -121,17 +131,26 @@ class DataModuleFromRaw:
                 only_demog_map = demog_map[['person_id'] + demog_columns] # person_id is important for mapping
                 data = pd.merge(data, only_demog_map, on='person_id', how='left', validate='many_to_one')
 
-            assert set(demog_columns).issubset(data.columns), f"Demographics columns {demog_columns} not found in the data"
+            assert set(demog_columns).issubset(data.columns), f"Some/all demographics columns {demog_columns} not found in the data"
             
             possible_categories = {
                 'gender': [1, 2, 5],
                 'education': [1, 2, 3, 4, 5, 6, 7],
                 'race': [1, 2, 3, 4, 5, 6]
             }
-            categorical_demog = data[categorical_features]
+
+            demog_data = data[demog_columns]
+            # handle missing value
+            
+            if demog_data.isna().any().any():
+                log_info(logger, f"Demographic columns {demog_data.columns[demog_data.isna().any()].tolist()} have {demog_data.isna().sum().sum()} NaN values in total.")
+                demog_data.fillna(value={col: demog_data[col].mode().values[0] for col in demog_columns}, inplace=True)
+                log_info(logger, f"Filled these NaN values (if existed) with mode of the column.\n")
+
+            categorical_demog = demog_data[categorical_features]
             one_hot_encoded_data = self._one_hot_encode_demog(categorical_demog, categorical_features, possible_categories)
 
-            continous_data = data[continous_features]
+            continous_data = demog_data[continous_features]
             scaler = MinMaxScaler()
             scaled_data = pd.DataFrame(
                 scaler.fit_transform(continous_data),
@@ -140,21 +159,17 @@ class DataModuleFromRaw:
 
             selected_data = pd.concat([selected_data, one_hot_encoded_data, scaled_data], axis=1)
 
-        log_info(logger, f"Columns with NaN values: {selected_data.columns[selected_data.isna().any()].tolist()}")
-        selected_data = selected_data.dropna() # drop NaN values
-        log_info(logger, f"Removed NaN values if existed. {len(selected_data)} samples remaining.\n")
-
-        assert selected_data.isna().any().any() == False, "There are still NaN values in the data."
-        assert selected_data.isnull().any().any() == False, "The are still null values in the data"
-
-        if mode == "train" and "alpha" in self.config:
+        if mode == "train" and "alpha" in self.config: # adding alpha in config during the beginning of training
             log_info(logger, f"Updating labels of {path} file.\n")
             self._label_fix_inplace(selected_data)
 
-        if mode == "train_only_LLM":
-            log_info(logger, f"Using only LLM labels of {path} file.\n")
-            assert self.config.llm_column in selected_data.columns, f"LLM column {self.config.llm_column} not found in the data"
-            selected_data = selected_data.rename(columns={self.config.llm_column: self.config.label_column})
+        if selected_data.isna().any().any(): 
+            log_info(logger, f"Columns {selected_data.columns[selected_data.isna().any()].tolist()} have {selected_data.isna().sum().sum()} NaN values in total.")
+            selected_data = selected_data.dropna() # drop NaN values; this could be NaN if the essay or label is None, so we drop the whole row
+            log_info(logger, f"Removed NaN values if existed. {len(selected_data)} samples remaining.\n")
+
+        assert selected_data.isna().any().any() == False, "There are still NaN values in the data."
+        assert selected_data.isnull().any().any() == False, "The are still null values in the data"
 
         return selected_data
 
@@ -194,7 +209,7 @@ class DataModuleFromRaw:
         assert all_data.isna().any().any() == False, "There are still NaN values in the data."
         assert all_data.isnull().any().any() == False, "The are still null values in the data"
 
-        # all_data.to_csv("tmp/all_data.tsv", sep='\t', index=False) # save the data for debugging
+        all_data.to_csv(f"tmp/all_{mode}_data.tsv", sep='\t', index=False) # save the data for debugging
 
         # add sample_id column
         # all_data['sample_id'] = range(len(all_data))     

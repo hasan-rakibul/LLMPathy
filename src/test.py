@@ -3,13 +3,14 @@ import transformers
 import lightning as L
 from omegaconf import OmegaConf
 from preprocess import DataModuleFromRaw
-from model import LightningPLM
 import zipfile
 import logging
 import torch
 from torchmetrics.functional import pearson_corrcoef, concordance_corrcoef, mean_squared_error
 import pandas as pd
 from utils import resolve_logging_dir, log_info, read_file, resolve_seed_wise_checkpoint, process_seedwise_metrics
+
+from model_and_trainer import load_model_from_ckpt
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ def test_plm(config: OmegaConf, make_ready_for_submission: bool = False, have_la
     )
 
     with trainer.init_module(empty_init=True):
-        model = LightningPLM.load_from_checkpoint(config.test_from_checkpoint)
+        model = load_model_from_ckpt(config, config.test_from_checkpoint)
 
     log_info(logger, f"Loaded model from {config.test_from_checkpoint}")
     
