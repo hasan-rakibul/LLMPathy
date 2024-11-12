@@ -1,4 +1,4 @@
-from transformers import AutoModelForSequenceClassification, get_linear_schedule_with_warmup
+from transformers import AutoModelForSequenceClassification, get_linear_schedule_with_warmup, get_polynomial_decay_schedule_with_warmup
 import torch
 import lightning as L
 from lightning.pytorch.utilities import rank_zero_only
@@ -48,34 +48,40 @@ class LightningPLM(L.LightningModule):
             weight_decay=self.config.adamw_weight_decay
         )
 
-        if self.config.lr_scheduler_type == "plateau":
-            lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-                optimiser,
-                mode='min',
-                patience=self.config.plateau_patience,
-                factor=self.config.plateau_factor,
-                threshold=self.config.plateau_threshold
-            )
-        elif self.config.lr_scheduler_type == "linear":
-            num_training_step = self.config.num_training_steps
-            if "linear_num_warmup_steps" in self.config:
-                num_warmup_steps = self.config.linear_num_warmup_steps
-            else:
-                assert "linear_warmup" in self.config, "linear_warmup not found in config"
-                num_warmup_steps = self.config.linear_warmup*num_training_step
-            lr_scheduler = get_linear_schedule_with_warmup(
-                optimiser,
-                num_warmup_steps=num_warmup_steps,
-                num_training_steps=num_training_step
-            )
-        return {
-            'optimizer': optimiser,
-            'lr_scheduler': {
-                'scheduler': lr_scheduler,
-                'monitor': 'val_loss',
-                'frequency': 1
+        if self.config.use_lr_scheduler:
+            if self.config.lr_scheduler_type == "plateau":
+                lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                    optimiser,
+                    mode='min',
+                    patience=self.config.plateau_patience,
+                    factor=self.config.plateau_factor,
+                    threshold=self.config.plateau_threshold
+                )
+            elif self.config.lr_scheduler_type == "linear":
+                lr_scheduler = get_linear_schedule_with_warmup(
+                    optimiser,
+                    num_warmup_steps=self.config.num_warmup_steps,
+                    num_training_steps=self.config.num_training_steps
+                )
+            elif self.config.lr_scheduler_type == "polynomial":
+                lr_scheduler = get_polynomial_decay_schedule_with_warmup(
+                    optimiser,
+                    num_warmup_steps=self.config.num_warmup_steps,
+                    num_training_steps=self.config.num_training_steps,
+                    lr_end=1.0e-6
+                )
+            
+            return {
+                'optimizer': optimiser,
+                'lr_scheduler': {
+                    'scheduler': lr_scheduler,
+                    'monitor': 'val_loss',
+                    'frequency': 1
+                }
             }
-        }
+        
+        else:
+            return optimiser
     
     @rank_zero_only
     def _calc_save_predictions(self, preds, mode='test'):
@@ -92,7 +98,7 @@ class LightningPLM(L.LightningModule):
         outputs = self(batch)
 
         loss = torch.nn.functional.mse_loss(outputs, batch['labels'])
-        self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True, sync_dist=True)
+        self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=False, logger=True, sync_dist=True)
         
         self.training_step_outputs.append(outputs)
         self.training_step_labels.append(batch['labels'])
@@ -115,21 +121,21 @@ class LightningPLM(L.LightningModule):
             'train_pcc', 
             pearson_corrcoef(all_preds, all_labels),
             logger=True,
-            prog_bar=True,
+            prog_bar=False,
             sync_dist=True
         )
         self.log(
             'train_ccc',
             concordance_corrcoef(all_preds, all_labels),
             logger=True,
-            prog_bar=True,
+            prog_bar=False,
             sync_dist=True
         )
         self.log(
             'train_rmse',
             mean_squared_error(all_preds, all_labels, squared=False),
             logger=True,
-            prog_bar=True,
+            prog_bar=False,
             sync_dist=True
         )
         self.training_step_outputs.clear() # free up memory
@@ -138,7 +144,7 @@ class LightningPLM(L.LightningModule):
     def validation_step(self, batch, batch_idx):
         outputs = self(batch)
         loss = torch.nn.functional.mse_loss(outputs, batch['labels'])
-        self.log('val_loss', loss, on_step=True, on_epoch=True, logger=True, prog_bar=True, sync_dist=True)
+        self.log('val_loss', loss, on_step=True, on_epoch=True, logger=True, prog_bar=False, sync_dist=True)
 
         self.validation_step_outputs.append(outputs)
         self.validation_step_labels.append(batch['labels'])
@@ -154,21 +160,21 @@ class LightningPLM(L.LightningModule):
             'val_pcc',
             pearson_corrcoef(all_preds, all_labels),
             logger=True,
-            prog_bar=True,
+            prog_bar=False,
             sync_dist=True
         )
         self.log(
             'val_ccc',
             concordance_corrcoef(all_preds, all_labels),
             logger=True,
-            prog_bar=True,
+            prog_bar=False,
             sync_dist=True
         )
         self.log(
             'val_rmse',
             mean_squared_error(all_preds, all_labels, squared=False),
             logger=True,
-            prog_bar=True,
+            prog_bar=False,
             sync_dist=True
         )
 
@@ -202,21 +208,21 @@ class LightningPLM(L.LightningModule):
                 'test_pcc',
                 pearson_corrcoef(all_preds, all_labels),
                 logger=False,
-                prog_bar=True,
+                prog_bar=False,
                 sync_dist=True
             )
             self.log(
                 'test_ccc',
                 concordance_corrcoef(all_preds, all_labels),
                 logger=False,
-                prog_bar=True,
+                prog_bar=False,
                 sync_dist=True
             )
             self.log(
                 'test_rmse',
                 mean_squared_error(all_preds, all_labels, squared=False),
                 logger=False,
-                prog_bar=True,
+                prog_bar=False,
                 sync_dist=True
             )
 
@@ -308,4 +314,16 @@ class LightningPLMFC(LightningPLM):
             attention_mask=batch['attention_mask'],
             demographic_vector=demographic_vector
         )
+ 
+def init_model(config: OmegaConf) -> L.LightningModule:
+    if config.use_demographics:
+        return LightningPLMFC(config)
+    else:
+        return LightningPLM(config)
     
+def load_model_from_ckpt(config: OmegaConf, ckpt: str) -> L.LightningModule:
+    if config.use_demographics:
+        return LightningPLMFC.load_from_checkpoint(ckpt)
+    else:
+        return LightningPLM.load_from_checkpoint(ckpt)
+ 

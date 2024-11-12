@@ -1,35 +1,35 @@
 import os
 import logging
-import torch
 import transformers
 import lightning as L
 from omegaconf import OmegaConf
 import numpy as np
+import warnings
 
-from utils import log_info, resolve_logging_dir, process_seedwise_metrics, prepare_train_config
-
-from model_and_trainer import init_model, load_model_from_ckpt, get_trainer
+from utils import log_info, resolve_logging_dir, process_seedwise_metrics, prepare_train_config, get_trainer
+from model import init_model, load_model_from_ckpt
 from preprocess import DataModuleFromRaw
 from test import test_plm
 
 logger = logging.getLogger(__name__)
 
 
-def _train_validate_plm(config, train_dl=None):
+def _train_validate_plm(config: OmegaConf) -> tuple:
     datamodule = DataModuleFromRaw(config)
     
+    train_dl = datamodule.get_train_dl(data_path_list=config.train_file_list)
     val_dl = datamodule.get_val_dl(data_path_list=config.val_file_list)
 
     trainer = get_trainer(config, enable_early_stopping=True)
-    if train_dl is None:
-        train_dl = datamodule.get_train_dl(data_path_list=config.train_file_list)
 
-    if config.lr_scheduler_type == "linear":
+    if config.use_lr_scheduler and (config.lr_scheduler_type == "linear" or config.lr_scheduler_type == "polynomial"):
         # number of training steps is required for linear scheduler
         config.num_training_steps = len(train_dl) * config.num_epochs
+        config.num_warmup_steps = config.warmup_ratio * config.num_training_steps
 
     if config.lr_find: # didn't work well in a casual run
-        raise NotImplementedError("lr_find needs to be re-configured as the model initialisation is moved to later part")
+        model = init_model(config)
+        warnings.warn("lr_find is not tested well. So, be cautious.")
         # https://lightning.ai/docs/pytorch/stable/advanced/training_tricks.html
         tuner = L.pytorch.tuner.Tuner(trainer)
         lr_finder = tuner.lr_find(model=model, train_dataloaders=train_dl, val_dataloaders=val_dl)
@@ -37,10 +37,10 @@ def _train_validate_plm(config, train_dl=None):
         fig.savefig(os.path.join(config.logging_dir, "lr_finder.png"))
         log_info(logger, f"lr_finder plot saved at {config.logging_dir}/lr_finder.png")
         config.lr = lr_finder.suggestion() # update config
-        model.learning_rate = lr_finder.suggestion() # update model
     
     if "resume_train_from_checkpoint" in config:
         log_info(logger, f"Resuming training from {config.resume_train_from_checkpoint}")
+        warnings.warn("Optimiser / scheduler states are not managed I think. So, be cautious.")
         # https://lightning.ai/docs/pytorch/stable/advanced/model_init.html
         with trainer.init_module():
             # model created here directly goes to GPU
@@ -57,8 +57,9 @@ def _train_validate_plm(config, train_dl=None):
         with trainer.init_module(empty_init=True):
             model = load_model_from_ckpt(config, config.finetune_from_checkpoint)
 
-        log_info(logger, f"Updating the learning rate {model.learning_rate} to {config.lr}")
-        model.learning_rate = config.lr
+        log_info(logger, f"Updating the learning rate {model.learning_rate} to {config.finetune_lr}")
+        config.lr = config.finetune_lr
+        model.learning_rate = config.finetune_lr
         model.configure_optimizers() # update the optimiser with the new learning rate, not sure if this is required, but just in case
 
         trainer.fit(
@@ -147,13 +148,6 @@ if __name__ == "__main__":
     config = OmegaConf.merge(config_common, config_train)
 
     config = prepare_train_config(config)
-
-    if "updated_train_dl_file" in config:
-        train_dl = torch.load(config.updated_train_dl_file, weights_only=False)
-        log_info(logger, f"Loaded updated train_dl from {config.updated_train_dl_file}")
-        log_info(logger, f"Total number of training samples: {len(train_dl.dataset)}")
-        config.logging_dir = os.path.dirname(config.updated_train_dl_file)
-        _ = _train_validate_plm(config, train_dl)
 
     if config.debug_mode:
         logger.setLevel(logging.DEBUG)

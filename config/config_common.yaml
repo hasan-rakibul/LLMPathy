@@ -1,40 +1,10 @@
-seeds: [0, 42, 100, 999, 1234]
+# common between train and test
 num_workers: 12
 plm: roberta-base
 # plm: siebert/sentiment-roberta-large-english
 
-# tune_hparams: True
-# lrs: [1.0e-5, 2.0e-5, 3.0e-5, 5.0e-5, 1.0e-6]
-# batch_sizes: [16, 32]
-
-tune_hparams: False
-tuned_lr: 3.0e-05
-tuned_batch_size: 16
-tuned_alpha: 4.5
-
-num_epochs: 10
-eval_batch_size: 32
 max_length: 512
-
-logging_dir: ./logs
-# fc_arch: [768, 512, 256, 1] # [out_transforer, out_pre_fusion, out_fusion, out]
-freeze_plm: False
-lr_find: False  # unfornately, it didn't work for me
-
-adamw_beta1: 0.9
-adamw_beta2: 0.98
-adamw_eps: 1.0e-06
-adamw_weight_decay: 0.1
-
-lr_scheduler_type: linear
-linear_warmup: 0.06
-# linear_num_warmup_steps: 300
-
-# lr_scheduler_type: plateau
-# plateau_patience: 10
-# plateau_factor: 0.676
-# plateau_threshold: 0.0057
-
+fc_arch: [768, 512, 256, 1] # [out_transforer, out_pre_fusion, out_fusion, out]
 label_column: empathy
 llm_column: llm_empathy
 feature_to_tokenise: ["essay"]
@@ -42,5 +12,4 @@ feature_to_tokenise: ["essay"]
 # extra_columns_to_keep: ["article_id"]
 extra_columns_to_keep: []
 
-# demographics: ['gender', 'education', 'race', 'age', 'income']
-# demographics_2024: ['person_id']
+use_demographics: False

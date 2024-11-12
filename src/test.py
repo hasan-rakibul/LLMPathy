@@ -10,7 +10,7 @@ from torchmetrics.functional import pearson_corrcoef, concordance_corrcoef, mean
 import pandas as pd
 from utils import resolve_logging_dir, log_info, read_file, resolve_seed_wise_checkpoint, process_seedwise_metrics
 
-from model_and_trainer import load_model_from_ckpt
+from model import load_model_from_ckpt
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +114,7 @@ if __name__ == "__main__":
 
     config.batch_size = config.eval_batch_size
     config.test_file_list = []
-    make_ready_for_submission = False
+    make_ready_for_submission = True
     have_label = True
     for data in config.test_data:
         config.test_file_list.append(config[data].test)

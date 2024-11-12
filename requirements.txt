@@ -10,13 +10,13 @@ scienceplots
 omegaconf
 ipykernel # for jupyter notebook
 scipy
+scikit-learn 
 
 # for Optuna hyperparameter optimisation
 #optuna
 #optuna-integration[pytorch-lightning]
 #plotly # for visualisation
 #kaleido # for visualisation
-#scikit-learn # for calculation in visualisation
 
 ## LoRA
 # sentencepiece

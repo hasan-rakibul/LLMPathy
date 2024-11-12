@@ -145,7 +145,7 @@ class DataModuleFromRaw:
             if demog_data.isna().any().any():
                 log_info(logger, f"Demographic columns {demog_data.columns[demog_data.isna().any()].tolist()} have {demog_data.isna().sum().sum()} NaN values in total.")
                 demog_data.fillna(value={col: demog_data[col].mode().values[0] for col in demog_columns}, inplace=True)
-                log_info(logger, f"Filled these NaN values (if existed) with mode of the column.\n")
+                log_info(logger, f"Filled these NaN values with mode of the column.\n")
 
             categorical_demog = demog_data[categorical_features]
             one_hot_encoded_data = self._one_hot_encode_demog(categorical_demog, categorical_features, possible_categories)
@@ -166,7 +166,7 @@ class DataModuleFromRaw:
         if selected_data.isna().any().any(): 
             log_info(logger, f"Columns {selected_data.columns[selected_data.isna().any()].tolist()} have {selected_data.isna().sum().sum()} NaN values in total.")
             selected_data = selected_data.dropna() # drop NaN values; this could be NaN if the essay or label is None, so we drop the whole row
-            log_info(logger, f"Removed NaN values if existed. {len(selected_data)} samples remaining.\n")
+            log_info(logger, f"Removed rows with any NaN values. {len(selected_data)} samples remaining.\n")
 
         assert selected_data.isna().any().any() == False, "There are still NaN values in the data."
         assert selected_data.isnull().any().any() == False, "The are still null values in the data"
@@ -209,7 +209,7 @@ class DataModuleFromRaw:
         assert all_data.isna().any().any() == False, "There are still NaN values in the data."
         assert all_data.isnull().any().any() == False, "The are still null values in the data"
 
-        all_data.to_csv(f"tmp/all_{mode}_data.tsv", sep='\t', index=False) # save the data for debugging
+        # all_data.to_csv(f"tmp/all_{mode}_data.tsv", sep='\t', index=False) # save the data for debugging
 
         # add sample_id column
         # all_data['sample_id'] = range(len(all_data))     
