@@ -4,7 +4,6 @@ plm: roberta-base
 # plm: siebert/sentiment-roberta-large-english
 
 max_length: 512
-fc_arch: [768, 512, 256, 1] # [out_transforer, out_pre_fusion, out_fusion, out]
 label_column: empathy
 llm_column: llm_empathy
 feature_to_tokenise: ["essay"]
@@ -13,3 +12,4 @@ feature_to_tokenise: ["essay"]
 extra_columns_to_keep: []
 
 use_demographics: False
+# fc_arch: [768, 512, 256, 1] # [out_transforer, out_pre_fusion, out_fusion, out]

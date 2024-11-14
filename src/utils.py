@@ -19,6 +19,23 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# collected and slightly updated from https://github.com/Lightning-AI/pytorch-lightning/issues/16881#issuecomment-1447429542
+class DelayedStartEarlyStopping(EarlyStopping):
+    def __init__(self, start_epoch, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # set start_epoch to None or 0 for no delay
+        self.start_epoch = start_epoch
+
+    def on_train_epoch_end(self, trainer: "L.Trainer", l_module: "L.LightningModule") -> None:
+        if (self.start_epoch is not None) and (trainer.current_epoch < self.start_epoch):
+            return
+        super().on_train_epoch_end(trainer, l_module)
+
+    def on_validation_end(self, trainer: "L.Trainer", l_module: "L.LightningModule") -> None:
+        if (self.start_epoch is not None) and (trainer.current_epoch < self.start_epoch):
+            return
+        super().on_validation_end(trainer, l_module)
+
 def get_trainer(config, devices="auto", extra_callbacks=None, enable_checkpointing=True, enable_early_stopping=True):
     """
     By default, we have EarlyStopping.
@@ -28,19 +45,21 @@ def get_trainer(config, devices="auto", extra_callbacks=None, enable_checkpointi
     callbacks = []
 
     if enable_early_stopping:
-        # early_stopping = EarlyStopping(
-        #     monitor="val_pcc",
-        #     patience=5,
-        #     mode="max",
-        #     min_delta=0.001
-        # )
-        # maybe val_pcc is not a good idea as pcc is not correlated beween val and test
-        early_stopping = EarlyStopping(
-            monitor="val_loss",
+        early_stopping = DelayedStartEarlyStopping(
+            start_epoch=5,
+            monitor="val_ccc",
             patience=2,
-            mode="min",
-            min_delta=0.001
+            mode="max",
+            min_delta=0,
+            verbose=True
         )
+        # maybe val_pcc is not a good idea as pcc is not correlated beween val and test
+        # early_stopping = EarlyStopping(
+        #     monitor="val_loss",
+        #     patience=2,
+        #     mode="min",
+        #     min_delta=0.1
+        # )
         callbacks.append(early_stopping)
     else:
         log_info(logger, "Early stopping disabled")
@@ -76,7 +95,7 @@ def get_trainer(config, devices="auto", extra_callbacks=None, enable_checkpointi
         callbacks=callbacks,
         devices=devices,
         enable_checkpointing=enable_checkpointing,
-        limit_train_batches=0.1 if config.debug_mode else 1.0,
+        limit_train_batches=0.1 if config.debug_mode else 1.0 
     )
 
     return trainer

@@ -20,12 +20,21 @@ def _train_validate_plm(config: OmegaConf) -> tuple:
     train_dl = datamodule.get_train_dl(data_path_list=config.train_file_list)
     val_dl = datamodule.get_val_dl(data_path_list=config.val_file_list)
 
-    trainer = get_trainer(config, enable_early_stopping=True)
+    trainer = get_trainer(config, enable_early_stopping=config.enable_early_stopping)
 
-    if config.use_lr_scheduler and (config.lr_scheduler_type == "linear" or config.lr_scheduler_type == "polynomial"):
+    if config.lr_scheduler_type == "linear" or config.lr_scheduler_type == "polynomial":
         # number of training steps is required for linear scheduler
         config.num_training_steps = len(train_dl) * config.num_epochs
-        config.num_warmup_steps = config.warmup_ratio * config.num_training_steps
+        if "num_warmup_steps" in config:
+            config.num_warmup_steps = config.num_warmup_steps
+            if config.num_warmup_steps > config.num_training_steps:
+                raise ValueError("Number of warmup steps cannot be greater than the number of training steps.")
+            if "warmup_ratio" in config:
+                warnings.warn("Both num_warmup_steps and warmup_ratio are provided. Ignoring warmup_ratio.")
+        else:
+            config.num_warmup_steps = config.warmup_ratio * config.num_training_steps
+            config.num_warmup_steps = config.warmup_ratio * len(train_dl) * 10 # 10 epochs of warmup calculation, like the RoBERTa paper
+        log_info(logger, f"Number of warmup steps: {config.num_warmup_steps}")
 
     if config.lr_find: # didn't work well in a casual run
         model = init_model(config)
@@ -53,14 +62,14 @@ def _train_validate_plm(config: OmegaConf) -> tuple:
             ckpt_path=config.resume_train_from_checkpoint
         )
     elif "finetune_from_checkpoint" in config:
+        config.lr = config.finetune_lr
         log_info(logger, f"Fine-tuning from {config.finetune_from_checkpoint}")
         with trainer.init_module(empty_init=True):
             model = load_model_from_ckpt(config, config.finetune_from_checkpoint)
 
-        log_info(logger, f"Updating the learning rate {model.learning_rate} to {config.finetune_lr}")
-        config.lr = config.finetune_lr
-        model.learning_rate = config.finetune_lr
-        model.configure_optimizers() # update the optimiser with the new learning rate, not sure if this is required, but just in case
+        log_info(logger, f"Fine-tuning LR: {model.learning_rate}")
+        # model.learning_rate = config.finetune_lr
+        # model.configure_optimizers() # update the optimiser with the new learning rate, not sure if this is required, but just in case
 
         trainer.fit(
             model=model,

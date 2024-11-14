@@ -3,20 +3,21 @@ debug_mode: False # will run only 1 epoch of training with 1% of training data, 
 do_test: True # whether to run subsequent test or not; required on trained on tuned hyperparameters
 save_predictions_to_disk: False # True or False
 
-main_label: y # y' - LLM-GEm; y - vanilla
+main_label: y' # y' - LLM-GEm; y - vanilla
 
-train_data: [2024] # for y or y'
+train_data: [2024, 2023, 2022] # for y or y'
 train_only_llm_data: [] # for y_llm
 
-expt_name_postfix: MultiHparam-Demog-10Epoch # postfix to be added on top of main_label, train_data and train_only_llm_data
+expt_name_postfix: 20EpochBut10EpochInWarmupCalc # postfix to be added on top of main_label, train_data and train_only_llm_data
 # overwrite_logging_dir: logs/20241109_154046_y'(2024,2023,2022)-MultiHparam-Demog-10Epoch 
-overwrite_logging_dir: tmp
 # resume_train_from_checkpoint: logs/20241023_205914_vanilla+2023LLM/lightning_logs/version_17110004/checkpoints/epoch=5-step=378.ckpt
 
-finetune_from_checkpoint: logs/20241101_014137_y'(2024,2023,2022)-MultiHparam/lr_3e-05_bs_16/alpha_4.5/seed_42/lightning_logs/version_17961088/checkpoints/epoch=9-step=2590.ckpt 
-finetune_lr: 3.0e-6
+# finetune_from_checkpoint: logs/20241101_014137_y'(2024,2023,2022)-MultiHparam/lr_3e-05_bs_16/alpha_4.5/seed_42/lightning_logs/version_17961088/checkpoints/epoch=9-step=2590.ckpt 
+# finetune_lr: 1.0e-7
 
-num_epochs: 10
+enable_early_stopping: True
+
+num_epochs: 20
 # seeds: [0, 42, 100, 999, 1234]
 seeds: [42]
 
@@ -38,13 +39,11 @@ adamw_beta2: 0.98
 adamw_eps: 1.0e-06
 adamw_weight_decay: 0.1
 
-use_lr_scheduler: False
-lr_scheduler_type: linear
-# lr_scheduler_type: polynomial
+lr_scheduler_type: linear # False, linear, polynomial, plateau
 
 warmup_ratio: 0.06
+# num_warmup_steps: 150
 
-# lr_scheduler_type: plateau
 # plateau_patience: 1
 # plateau_factor: 0.05
 # plateau_threshold: 1.0e-4

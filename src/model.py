@@ -48,40 +48,39 @@ class LightningPLM(L.LightningModule):
             weight_decay=self.config.adamw_weight_decay
         )
 
-        if self.config.use_lr_scheduler:
-            if self.config.lr_scheduler_type == "plateau":
-                lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-                    optimiser,
-                    mode='min',
-                    patience=self.config.plateau_patience,
-                    factor=self.config.plateau_factor,
-                    threshold=self.config.plateau_threshold
-                )
-            elif self.config.lr_scheduler_type == "linear":
-                lr_scheduler = get_linear_schedule_with_warmup(
-                    optimiser,
-                    num_warmup_steps=self.config.num_warmup_steps,
-                    num_training_steps=self.config.num_training_steps
-                )
-            elif self.config.lr_scheduler_type == "polynomial":
-                lr_scheduler = get_polynomial_decay_schedule_with_warmup(
-                    optimiser,
-                    num_warmup_steps=self.config.num_warmup_steps,
-                    num_training_steps=self.config.num_training_steps,
-                    lr_end=1.0e-6
-                )
-            
-            return {
-                'optimizer': optimiser,
-                'lr_scheduler': {
-                    'scheduler': lr_scheduler,
-                    'monitor': 'val_loss',
-                    'frequency': 1
-                }
-            }
-        
-        else:
+        if not self.config.lr_scheduler_type: # no lr scheduler
             return optimiser
+        
+        elif self.config.lr_scheduler_type == "plateau":
+            lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                optimiser,
+                mode='min',
+                patience=self.config.plateau_patience,
+                factor=self.config.plateau_factor,
+                threshold=self.config.plateau_threshold
+            )
+        elif self.config.lr_scheduler_type == "linear":
+            lr_scheduler = get_linear_schedule_with_warmup(
+                optimiser,
+                num_warmup_steps=self.config.num_warmup_steps,
+                num_training_steps=self.config.num_training_steps
+            )
+        elif self.config.lr_scheduler_type == "polynomial":
+            lr_scheduler = get_polynomial_decay_schedule_with_warmup(
+                optimiser,
+                num_warmup_steps=self.config.num_warmup_steps,
+                num_training_steps=self.config.num_training_steps,
+                lr_end=1.0e-6
+            )
+        
+        return {
+            'optimizer': optimiser,
+            'lr_scheduler': {
+                'scheduler': lr_scheduler,
+                'monitor': 'val_loss',
+                'frequency': 1
+            }
+        }
     
     @rank_zero_only
     def _calc_save_predictions(self, preds, mode='test'):
@@ -323,7 +322,7 @@ def init_model(config: OmegaConf) -> L.LightningModule:
     
 def load_model_from_ckpt(config: OmegaConf, ckpt: str) -> L.LightningModule:
     if config.use_demographics:
-        return LightningPLMFC.load_from_checkpoint(ckpt)
+        return LightningPLMFC.load_from_checkpoint(ckpt, config=config)
     else:
-        return LightningPLM.load_from_checkpoint(ckpt)
+        return LightningPLM.load_from_checkpoint(ckpt, config=config)
  
