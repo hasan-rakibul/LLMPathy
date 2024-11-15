@@ -66,12 +66,10 @@ def get_trainer(config, devices="auto", extra_callbacks=None, enable_checkpointi
 
     if enable_checkpointing:
         # have a ModelCheckpoint callback
-        # callbacks.append(
-        #     ModelCheckpoint(
-        #         monitor="val_pcc",
-        #         save_top_k=1,
-        #         mode="max"
-        #     )
+        # checkpoint = ModelCheckpoint(
+        #     monitor="val_ccc",
+        #     save_top_k=1,
+        #     mode="max"
         # )
         # checkpoint = ModelCheckpoint(
         #     monitor="val_loss",
@@ -140,7 +138,7 @@ def resolve_logging_dir(config):
     return logging_dir
 
 def resolve_seed_wise_checkpoint(parent_dir: str, seed: float) -> str:
-    ckpt = glob.glob(os.path.join(parent_dir, f"seed_{seed}/**/*.ckpt"), recursive=True)
+    ckpt = glob.glob(os.path.join(parent_dir, f"**/seed_{seed}/**/*.ckpt"), recursive=True)
     assert len(ckpt) == 1, f"Found {len(ckpt)} checkpoints for seed {seed}"
     return ckpt[0]
 
@@ -229,5 +227,24 @@ def prepare_train_config(config: OmegaConf) -> OmegaConf:
 
     config.val_file_list = [config[2024].val] # fixed so far
     config.test_file_list = [config[2024].test] # fixed so far
+
+    config.do_test = False
+    if len(config.lrs) > 1 or len(config.batch_sizes) > 1 or len(config.alphas) > 1:
+        # means hyperparameter tuning
+        config.do_test = True
+    
+    return config
+
+def prepare_test_config(config: OmegaConf) -> OmegaConf:
+    config.batch_size = config.eval_batch_size
+    config.test_file_list = []
+    config.make_ready_for_submission = False 
+    config.have_label = True
+    for data in config.test_data:
+        config.test_file_list.append(getattr(config[data], config.test_split))
+        if data in [2023, 2022]:
+            # only way to test is through CodaLab submission
+            config.make_ready_for_submission = True
+            config.have_label = False
 
     return config

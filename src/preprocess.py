@@ -100,13 +100,13 @@ class DataModuleFromRaw:
             columns_to_keep.extend(self.config.extra_columns_to_keep_train) # this is a list
         
         if mode == "train_only_LLM":
+            assert self.config.llm_column in data.columns, f"{self.config.llm_column} column not found in the data"
             if self.config.label_column in data.columns:
                 data.drop(columns=[self.config.label_column], inplace=True) # remove the label column
             data.rename(columns={self.config.llm_column: self.config.label_column}, inplace=True)
 
         selected_data = data[columns_to_keep]
 
-        
         if self.config.use_demographics:
             log_info(logger, f"Using demographics data.")
 
@@ -201,12 +201,11 @@ class DataModuleFromRaw:
             # add the train_file_only_LLM_list
             for data_path in self.config.train_file_only_LLM_list:
                 # assuming no have_label, as we are using LLM labels as the main labels
-                data = self._raw_to_processed(data_path, have_label=False, mode="train_only_LLM")
+                data = self._raw_to_processed(data_path, have_label=True, mode="train_only_LLM")
                 all_data = pd.concat([all_data, data])
 
         log_info(logger, f"Total number of {mode} samples: {len(all_data)}\n")
-        
-        assert all_data.isna().any().any() == False, "There are still NaN values in the data."
+        assert all_data.isna().any().any() == False, "There are still NaN values in the data." # may occur due to the concat
         assert all_data.isnull().any().any() == False, "The are still null values in the data"
 
         # all_data.to_csv(f"tmp/all_{mode}_data.tsv", sep='\t', index=False) # save the data for debugging

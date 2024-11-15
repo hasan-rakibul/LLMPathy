@@ -17,7 +17,9 @@ class LightningPLM(L.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         self.config = config
-        self.learning_rate = self.config.lr # separate for lr tuning by lightning
+
+        if "lr" in self.config: # shall not have during testing
+            self.learning_rate = self.config.lr # separate for lr tuning by lightning
 
         self.model = AutoModelForSequenceClassification.from_pretrained(
             pretrained_model_name_or_path=self.config.plm,
@@ -177,9 +179,6 @@ class LightningPLM(L.LightningModule):
             sync_dist=True
         )
 
-        # if self.config.save_predictions_to_disk:
-        #     self._calc_save_predictions(all_preds, mode='val')
-
         self.validation_step_outputs.clear()
         self.validation_step_labels.clear()
 
@@ -226,7 +225,7 @@ class LightningPLM(L.LightningModule):
             )
 
         if self.config.save_predictions_to_disk:
-            self._calc_save_predictions(all_preds, mode='test')
+            self._calc_save_predictions(all_preds, mode=f"{self.config.test_split}_{self.config.test_data[0]}")
 
         self.test_step_outputs.clear()
         self.test_step_labels.clear()

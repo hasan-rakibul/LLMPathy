@@ -8,8 +8,8 @@ import logging
 import torch
 from torchmetrics.functional import pearson_corrcoef, concordance_corrcoef, mean_squared_error
 import pandas as pd
-from utils import resolve_logging_dir, log_info, read_file, resolve_seed_wise_checkpoint, process_seedwise_metrics
 
+from utils import resolve_logging_dir, log_info, read_file, resolve_seed_wise_checkpoint, process_seedwise_metrics, prepare_test_config
 from model import load_model_from_ckpt
 
 logger = logging.getLogger(__name__)
@@ -36,10 +36,6 @@ def test_plm(config: OmegaConf, make_ready_for_submission: bool = False, have_la
     log_info(logger, f"Loaded model from {config.test_from_checkpoint}")
     
     test_dl = datamodule.get_test_dl(data_path_list=config.test_file_list, have_label=have_label)
-
-    # modified setting from config do not work because we are loading a checkpoint with this value being False
-    model.config.save_predictions_to_disk = config.save_predictions_to_disk
-    model.config.logging_dir = config.logging_dir
 
     trainer.test(model=model, dataloaders=test_dl, verbose=True)
 
@@ -112,25 +108,16 @@ if __name__ == "__main__":
     config_common = OmegaConf.load("config/config_common.yaml")
     config = OmegaConf.merge(config_common, config_test)
 
-    config.batch_size = config.eval_batch_size
-    config.test_file_list = []
-    make_ready_for_submission = True
-    have_label = True
-    for data in config.test_data:
-        config.test_file_list.append(config[data].test)
-        if data in [2023, 2022]:
-            # only way to test is through CodaLab submission
-            make_ready_for_submission = True
-            have_label = False
+    config = prepare_test_config(config)
     
     if "test_from_checkpoint" in config:
         log_info(logger, f"Doing a single test using {config.test_from_checkpoint}")
         log_info(logger, f"Normal testing on {config.test_file_list}")
         config.logging_dir = resolve_logging_dir(config) # update customised logging_dir
-        test_plm(config, make_ready_for_submission, have_label)
+        test_plm(config, config.make_ready_for_submission, config.have_label)
     elif "test_from_ckpts_parent_dir" in config:
         log_info(logger, f"Multi-seed testing from {config.test_from_ckpts_parent_dir}")
-        _test_multi_seeds(config.test_from_ckpts_parent_dir, config, make_ready_for_submission)
+        _test_multi_seeds(config.test_from_ckpts_parent_dir, config, config.make_ready_for_submission)
     elif "test_zero_shot_file" in config:
         log_info(logger, f"Zero shot testing on {config.test_zero_shot_file}")
         if "val_goldstandard_file" in config:

@@ -13,7 +13,6 @@ from test import test_plm
 
 logger = logging.getLogger(__name__)
 
-
 def _train_validate_plm(config: OmegaConf) -> tuple:
     datamodule = DataModuleFromRaw(config)
     
@@ -137,12 +136,11 @@ def _seeds_sweep(config: OmegaConf, do_test: bool = False) -> None:
     process_seedwise_metrics(results, save_as)
 
 def _alpha_sweep(config: OmegaConf, do_test: bool) -> None:
-    alpha_range = np.arange(0, 6.5, 0.5)
     parent_logging_dir = config.logging_dir
 
-    for alpha in alpha_range:
+    for alpha in config.alphas:
         config.logging_dir = os.path.join(parent_logging_dir, f"alpha_{alpha}")
-        config.alpha = alpha.item() # converting to python float as numpy.float64 is not supported by OmegaConf
+        config.alpha = alpha
         log_info(logger, f"Current alpha: {config.alpha}")
         if os.path.exists(config.logging_dir):
             log_info(logger, f"Skipping this alpha ({alpha}) as the logging directory already exists: {config.logging_dir}")
@@ -171,33 +169,22 @@ if __name__ == "__main__":
         config.logging_dir = resolve_logging_dir(config) # update customised logging_dir
     
     if config.main_label == "y":
-        if not config.tune_hparams:
-            config.lr = config.tuned_lr
-            config.batch_size = config.tuned_batch_size
-            _seeds_sweep(config, do_test=config.do_test)
-        else:
-            parent_logging_dir = config.logging_dir
-            for lr in config.lrs:
-                config.lr = lr
-                for batch_size in config.batch_sizes:
-                    config.batch_size = batch_size
-                    log_info(logger, f"Current lr: {config.lr}, Current batch_size: {config.batch_size}")
-                    config.logging_dir = os.path.join(parent_logging_dir, f"lr_{config.lr}_bs_{config.batch_size}")
-                    _seeds_sweep(config, do_test=config.do_test)
+        parent_logging_dir = config.logging_dir
+        for lr in config.lrs:
+            config.lr = lr
+            for batch_size in config.batch_sizes:
+                config.batch_size = batch_size
+                log_info(logger, f"Current lr: {config.lr}, Current batch_size: {config.batch_size}")
+                config.logging_dir = os.path.join(parent_logging_dir, f"lr_{config.lr}_bs_{config.batch_size}")
+                _seeds_sweep(config, do_test=config.do_test)
     elif config.main_label == "y'":
-        if not config.tune_hparams:
-            config.lr = config.tuned_lr
-            config.batch_size = config.tuned_batch_size
-            config.alpha = config.tuned_alpha
-            _seeds_sweep(config, do_test=config.do_test)
-        else:
-            parent_logging_dir = config.logging_dir
-            for lr in config.lrs:
-                config.lr = lr
-                for batch_size in config.batch_sizes:
-                    config.batch_size = batch_size
-                    log_info(logger, f"Current lr: {config.lr}, Current batch_size: {config.batch_size}")
-                    config.logging_dir = os.path.join(parent_logging_dir, f"lr_{config.lr}_bs_{config.batch_size}")
-                    _alpha_sweep(config, do_test=config.do_test)
+        parent_logging_dir = config.logging_dir
+        for lr in config.lrs:
+            config.lr = lr
+            for batch_size in config.batch_sizes:
+                config.batch_size = batch_size
+                log_info(logger, f"Current lr: {config.lr}, Current batch_size: {config.batch_size}")
+                config.logging_dir = os.path.join(parent_logging_dir, f"lr_{config.lr}_bs_{config.batch_size}")
+                _alpha_sweep(config, do_test=config.do_test)
     else:
         raise ValueError(f"main_label must be either y or y'. Found {config.main_label}")

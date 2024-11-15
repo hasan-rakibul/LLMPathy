@@ -1,4 +1,5 @@
 # common between train and test
+seeds: [0, 42, 100, 999, 1234]
 num_workers: 12
 plm: roberta-base
 # plm: siebert/sentiment-roberta-large-english
@@ -7,9 +8,28 @@ max_length: 512
 label_column: empathy
 llm_column: llm_empathy
 feature_to_tokenise: ["essay"]
-# feature_to_tokenise: ["demographic_essay"]
-# extra_columns_to_keep: ["article_id"]
 extra_columns_to_keep: []
 
-use_demographics: False
+use_demographics: False 
 # fc_arch: [768, 512, 256, 1] # [out_transforer, out_pre_fusion, out_fusion, out]
+
+# all file list that we can use for training / validation / testing
+2024:
+    train: data/NewsEmp2024/trac3_EMP_train.csv
+    train_llama: data/NewsEmp2024/trac3_EMP_train_llama.tsv
+    val: data/NewsEmp2024/trac3_EMP_dev.csv
+    val_llama: data/NewsEmp2024/trac3_EMP_dev_llama.csv
+    test: data/NewsEmp2024/test_data_with_labels/goldstandard_EMP.csv
+2023:
+    train: data/NewsEmp2023/WASSA23_essay_level_with_labels_train.tsv
+    train_llama: data/NewsEmp2023/WASSA23_essay_level_with_labels_train_llama.tsv
+    val: data/NewsEmp2023/WASSA23_essay_level_dev.tsv 
+    val_llama: data/NewsEmp2023/WASSA23_essay_level_dev_llama.tsv
+    test: data/NewsEmp2023/WASSA23_essay_level_test.tsv
+2022:
+    train: data/NewsEmp2022/messages_train_ready_for_WS.tsv
+    train_llama: data/NewsEmp2022/messages_train_ready_for_WS_llama.tsv
+    val: data/NewsEmp2022/messages_dev_features_ready_for_WS_2022.tsv
+    val_llama: data/NewsEmp2022/messages_dev_features_ready_for_WS_2022_llama.tsv
+    test: data/NewsEmp2022/messages_test_features_ready_for_WS_2022.tsv
+    

@@ -3,20 +3,13 @@ eval_batch_size: 32
 
 save_predictions_to_disk: True # True or False
 
-# test_from_ckpts_parent_dir:  
-test_from_checkpoint: logs/20241106_203926_y'(2024,2023,2022)-SelectedHparam/seed_42/lightning_logs/version_18054428/checkpoints/epoch=9-step=2590.ckpt
+test_from_ckpts_parent_dir: logs/20241115_005338_y'(2024,2022)-ImprovedEarlyStop-MultiAlpha/lr_3e-05_bs_16/alpha_5.0
+# test_from_checkpoint: logs/20241106_203926_y'(2024,2023,2022)-SelectedHparam/seed_42/lightning_logs/version_18054428/checkpoints/epoch=9-step=2590.ckpt
+
 test_data: [2024]
+test_split: test # test, val, train, etc.; see config/config_common.yaml for more details
 
 #### zero-shot test using LLM
 # test_zero_shot_file: data/NewsEmp2024/trac3_EMP_dev_llama.tsv
 ## goldstand required for some val files
 # val_goldstandard_file: data/NewsEmp2022/goldstandard_dev_2022.tsv
-
-2024:
-    # test: data/NewsEmp2024/test_data_with_labels/goldstandard_EMP.csv
-    # test: data/NewsEmp2024/trac3_EMP_dev.csv # test on validation data
-    test: data/NewsEmp2024/trac3_EMP_train.csv
-2023:
-    test: data/NewsEmp2023/WASSA23_essay_level_test.tsv
-2022:
-    test: data/NewsEmp2022/messages_test_features_ready_for_WS_2022.tsv
