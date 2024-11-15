@@ -229,9 +229,14 @@ def prepare_train_config(config: OmegaConf) -> OmegaConf:
     config.test_file_list = [config[2024].test] # fixed so far
 
     config.do_test = False
-    if len(config.lrs) > 1 or len(config.batch_sizes) > 1 or len(config.alphas) > 1:
+    if len(config.lrs) > 1 or len(config.batch_sizes) > 1:
         # means hyperparameter tuning
         config.do_test = True
+
+    if "alphas" in config:
+        # we may not have alpha in normal settings
+        if len(config.alphas) > 1:
+            config.do_test = True
     
     return config
 
