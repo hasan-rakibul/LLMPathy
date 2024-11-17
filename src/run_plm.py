@@ -3,7 +3,6 @@ import logging
 import transformers
 import lightning as L
 from omegaconf import OmegaConf
-import numpy as np
 import warnings
 
 from utils import log_info, resolve_logging_dir, process_seedwise_metrics, prepare_train_config, get_trainer

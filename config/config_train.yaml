@@ -2,10 +2,10 @@ debug_mode: False # will run only 1 epoch of training with 1% of training data, 
 
 save_predictions_to_disk: False # True or False
 
-main_label: y # y' - LLM-GEm; y - vanilla
+main_label: y' # y' - LLM-GEm; y - vanilla
 
-train_data: [2024] # for y or y'
-train_only_llm_data: [2023, 2022] # for y_llm
+train_data: [2024, 2022] # for y or y'
+train_only_llm_data: [2023] # for y_llm
 
 expt_name_postfix: ImprovedEarlyStop # postfix to be added on top of main_label, train_data and train_only_llm_data
 # overwrite_logging_dir: logs/20241109_154046_y'(2024,2023,2022)-MultiHparam-Demog-10Epoch 
@@ -26,7 +26,7 @@ num_epochs: 20
 #### Selected hyperparameters
 lrs: [3.0e-5]
 batch_sizes: [16]
-alphas: [4.5]
+alphas: [4.0]
 
 logging_dir: ./logs
 freeze_plm: False

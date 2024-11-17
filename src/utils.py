@@ -164,7 +164,7 @@ def process_seedwise_metrics(results: List, save_as: str) -> None:
     log_info(logger, f"Results saved at {save_as}")
 
     # print the result, in LaTeX-table style
-    log_info(logger, "[Val, Test] PCC & CCC & RMSE (mean +/- std)")
+    log_info(logger, " & ".join(results_df.columns))
     log_info(logger, " & ".join([f"${mean:.3f}\\pm {std:.3f}$"\
             for mean, std in zip(mean_row, std_row)]))
 
@@ -228,16 +228,16 @@ def prepare_train_config(config: OmegaConf) -> OmegaConf:
     config.val_file_list = [config[2024].val] # fixed so far
     config.test_file_list = [config[2024].test] # fixed so far
 
-    config.do_test = False
-    if len(config.lrs) > 1 or len(config.batch_sizes) > 1:
-        # means hyperparameter tuning
-        config.do_test = True
-
+    config.do_test = True
+    
     if "alphas" in config:
         # we may not have alpha in normal settings
         if len(config.alphas) > 1:
-            config.do_test = True
-    
+            config.do_test = False
+    elif len(config.lrs) > 1 or len(config.batch_sizes) > 1:
+        # means hyperparameter tuning
+        config.do_test = False
+
     return config
 
 def prepare_test_config(config: OmegaConf) -> OmegaConf:

@@ -13,6 +13,7 @@ requirements_UCVME.txt
 
 src/archived/
 log_archived/
+log_slurm/
 
 req_resources.sh
 .make_env_ready.sh
