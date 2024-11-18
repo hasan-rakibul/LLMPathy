@@ -4,6 +4,7 @@ import transformers
 import lightning as L
 from omegaconf import OmegaConf
 import warnings
+import glob
 
 from utils import log_info, resolve_logging_dir, process_seedwise_metrics, prepare_train_config, get_trainer
 from model import init_model, load_model_from_ckpt
@@ -15,7 +16,12 @@ logger = logging.getLogger(__name__)
 def _train_validate_plm(config: OmegaConf) -> tuple:
     datamodule = DataModuleFromRaw(config)
     
-    train_dl = datamodule.get_train_dl(data_path_list=config.train_file_list)
+    if os.path.exists(config.logging_dir):
+        log_info(logger, f"Seed-level logging directory already exists: {config.logging_dir}. So, validating on the saved ckpt...")
+        # don't need the train dl
+    else:
+        train_dl = datamodule.get_train_dl(data_path_list=config.train_file_list)
+    
     val_dl = datamodule.get_val_dl(data_path_list=config.val_file_list)
 
     trainer = get_trainer(config, enable_early_stopping=config.enable_early_stopping)
@@ -46,6 +52,7 @@ def _train_validate_plm(config: OmegaConf) -> tuple:
         config.lr = lr_finder.suggestion() # update config
     
     if "resume_train_from_checkpoint" in config:
+        # lowest level of resume
         log_info(logger, f"Resuming training from {config.resume_train_from_checkpoint}")
         warnings.warn("Optimiser / scheduler states are not managed I think. So, be cautious.")
         # https://lightning.ai/docs/pytorch/stable/advanced/model_init.html
@@ -66,8 +73,6 @@ def _train_validate_plm(config: OmegaConf) -> tuple:
             model = load_model_from_ckpt(config, config.finetune_from_checkpoint)
 
         log_info(logger, f"Fine-tuning LR: {model.learning_rate}")
-        # model.learning_rate = config.finetune_lr
-        # model.configure_optimizers() # update the optimiser with the new learning rate, not sure if this is required, but just in case
 
         trainer.fit(
             model=model,
@@ -77,16 +82,24 @@ def _train_validate_plm(config: OmegaConf) -> tuple:
     else:
         log_info(logger, "Training from scratch")
         # https://lightning.ai/docs/pytorch/stable/advanced/model_init.html
-        with trainer.init_module():
-            # model created here directly goes to GPU
-            model = init_model(config) 
-        trainer.fit(
-            model=model,
-            train_dataloaders=train_dl,
-            val_dataloaders=val_dl
-        )
-    # getting the best model from the previous trainer
-    best_model_ckpt = trainer.checkpoint_callback.best_model_path
+
+        if not os.path.exists(config.logging_dir):
+            with trainer.init_module():
+                # model created here directly goes to GPU
+                model = init_model(config) 
+            trainer.fit(
+                model=model,
+                train_dataloaders=train_dl,
+                val_dataloaders=val_dl
+            )
+    
+    if os.path.exists(config.logging_dir):
+        ckpt_list = glob.glob(os.path.join(config.logging_dir, "**/*.ckpt"), recursive=True)
+        assert len(ckpt_list) == 1, f"Number of ckpt is not 1."
+        best_model_ckpt = ckpt_list[0]
+    else:
+        # getting the best model from the previous trainer
+        best_model_ckpt = trainer.checkpoint_callback.best_model_path
     
     # final validation at the end of training
     log_info(logger, f"Loading the best model from {best_model_ckpt}")
@@ -112,9 +125,9 @@ def _seeds_sweep(config: OmegaConf, do_test: bool = False) -> None:
         log_info(logger, f"Current seed: {config.seed}")
         config.logging_dir = os.path.join(parent_logging_dir, f"seed_{config.seed}")
 
-        if os.path.exists(config.logging_dir):
-            log_info(logger, f"The logging directory already exists: {config.logging_dir}. So, skipping this seed {seed}.")
-            return
+        # if os.path.exists(config.logging_dir):
+        #     log_info(logger, f"Seed-level logging directory already exists: {config.logging_dir}. So, skipping this seed {seed}.")
+        #     continue
 
         L.seed_everything(config.seed)
 
@@ -142,8 +155,12 @@ def _alpha_sweep(config: OmegaConf, do_test: bool) -> None:
         config.alpha = alpha
         log_info(logger, f"Current alpha: {config.alpha}")
         if os.path.exists(config.logging_dir):
-            log_info(logger, f"Skipping this alpha ({alpha}) as the logging directory already exists: {config.logging_dir}")
-            continue
+            log_info(logger, f"Alpha-level logging directory already exists: {config.logging_dir}")
+            if os.path.exists(os.path.join(config.logging_dir, "results.csv")):
+                log_info(logger, f"Alpha-level results.csv exists. So, skipping for this alpha.")
+                continue
+            else:
+                log_info(logger, f"Results do not exist for this alpha. So, resuming for the remaining seeds.")
         _seeds_sweep(config, do_test)
 
 if __name__ == "__main__":
@@ -163,6 +180,7 @@ if __name__ == "__main__":
     
     if "overwrite_logging_dir" in config:
         log_info(logger, f"Using overwrite_logging_dir {config.overwrite_logging_dir}")
+        log_info(logger, "MAKE SURE you DELETE the last directory manually which was not trained for all epochs.")
         config.logging_dir = config.overwrite_logging_dir
     else:
         config.logging_dir = resolve_logging_dir(config) # update customised logging_dir

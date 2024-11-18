@@ -208,14 +208,15 @@ def prepare_train_config(config: OmegaConf) -> OmegaConf:
         config.extra_columns_to_keep_train = []
         for data in config.train_data:
             config.train_file_list.append(config[data].train)
-            if data  == 2023 or data == 2022:
-                config.train_file_list.append(config[data].val) # add val data for 2022 and 2023
+            if data != config.val_data:
+                # we don't want to include val data of the same year
+                config.train_file_list.append(config[data].val)
     elif config.main_label == "y'":
         config.extra_columns_to_keep_train = [config.llm_column]
         for data in config.train_data:
             config.train_file_list.append(config[data].train_llama)
-            if data  == 2023 or data == 2022:
-                config.train_file_list.append(config[data].val_llama) # add val data for 2022 and 2023
+            if data != config.val_data:
+                config.train_file_list.append(config[data].val_llama)
     else:
         raise ValueError(f"main_label must be either y or y'. Found {config.main_label}")
 
@@ -225,12 +226,20 @@ def prepare_train_config(config: OmegaConf) -> OmegaConf:
         if data == 2023 or data == 2022:
             config.train_file_only_LLM_list.append(config[data].val_llama)
 
-    config.val_file_list = [config[2024].val] # fixed so far
-    config.test_file_list = [config[2024].test] # fixed so far
+    config.val_file_list = [config[config.val_data].val]
+    config.test_file_list = [config[config.val_data].test]
+    log_info(logger, f"Experiment name: {config.expt_name}")
+    log_info(logger, f"Train data: {config.train_file_list}")
+    log_info(logger, f"Train only LLM data: {config.train_file_only_LLM_list}")
+    log_info(logger, f"Val data: {config.val_file_list}")
+    log_info(logger, f"Test data: {config.test_file_list}")
 
     config.do_test = True
-    
-    if "alphas" in config:
+
+    if config.val_data in [2023, 2022]:
+        # only way to test is through CodaLab submission
+        config.do_test = False
+    elif "alphas" in config:
         # we may not have alpha in normal settings
         if len(config.alphas) > 1:
             config.do_test = False

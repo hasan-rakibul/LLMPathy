@@ -18,7 +18,7 @@ use_demographics: False
     train: data/NewsEmp2024/trac3_EMP_train.csv
     train_llama: data/NewsEmp2024/trac3_EMP_train_llama.tsv
     val: data/NewsEmp2024/trac3_EMP_dev.csv
-    val_llama: data/NewsEmp2024/trac3_EMP_dev_llama.csv
+    val_llama: data/NewsEmp2024/trac3_EMP_dev_llama.tsv
     test: data/NewsEmp2024/test_data_with_labels/goldstandard_EMP.csv
 2023:
     train: data/NewsEmp2023/WASSA23_essay_level_with_labels_train.tsv

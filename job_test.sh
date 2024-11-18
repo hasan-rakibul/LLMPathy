@@ -2,7 +2,6 @@
  
 #SBATCH --job-name=Test-PLM
 #SBATCH --output=log_slurm/%x_%j.out
-#SBATCH --error=log_slurm/%x_%j.err
 #SBATCH --time=1:00:00
 #SBATCH --nodes=1
 #SBATCH --partition=gpu
