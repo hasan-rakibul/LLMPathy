@@ -208,14 +208,15 @@ def prepare_train_config(config: OmegaConf) -> OmegaConf:
         config.extra_columns_to_keep_train = []
         for data in config.train_data:
             config.train_file_list.append(config[data].train)
-            if data != config.val_data:
+            if data != config.val_data and data != 2023:
                 # we don't want to include val data of the same year
+                # AND 2023 val is included in 2024 train
                 config.train_file_list.append(config[data].val)
     elif config.main_label == "y'":
         config.extra_columns_to_keep_train = [config.llm_column]
         for data in config.train_data:
             config.train_file_list.append(config[data].train_llama)
-            if data != config.val_data:
+            if data != config.val_data and data != 2023:
                 config.train_file_list.append(config[data].val_llama)
     else:
         raise ValueError(f"main_label must be either y or y'. Found {config.main_label}")
@@ -223,7 +224,7 @@ def prepare_train_config(config: OmegaConf) -> OmegaConf:
     config.train_file_only_LLM_list = []
     for data in config.train_only_llm_data:
         config.train_file_only_LLM_list.append(config[data].train_llama)
-        if data == 2023 or data == 2022:
+        if data != config.val_data and data != 2023:
             config.train_file_only_LLM_list.append(config[data].val_llama)
 
     config.val_file_list = [config[config.val_data].val]
