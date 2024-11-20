@@ -202,6 +202,9 @@ class DataModuleFromRaw:
             for data_path in self.config.train_file_only_LLM_list:
                 # assuming no have_label, as we are using LLM labels as the main labels
                 data = self._raw_to_processed(data_path, have_label=True, mode="train_only_LLM")
+                log_info(logger, f"Taking {self.config.train_only_llm_portion} portion of the data from {data_path} for training only LLM.\n")
+                data = data.sample(frac=self.config.train_only_llm_portion, random_state=self.config.seed)
+                log_info(logger, f"Number of only-LLM samples being used: {len(data)}\n")
                 all_data = pd.concat([all_data, data])
 
         log_info(logger, f"Total number of {mode} samples: {len(all_data)}\n")
@@ -210,8 +213,10 @@ class DataModuleFromRaw:
 
         # all_data.to_csv(f"tmp/all_{mode}_data.tsv", sep='\t', index=False) # save the data for debugging
 
-        # add sample_id column
-        # all_data['sample_id'] = range(len(all_data))     
+        if self.config.main_label == "y_agentic":
+            # add sample_id column
+            all_data['sample_id'] = range(len(all_data))     
+
         all_data_hf = Dataset.from_pandas(all_data, preserve_index=False) # convert to huggingface dataset
         
         # tokenise

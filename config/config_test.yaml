@@ -3,7 +3,7 @@ eval_batch_size: 32
 
 save_predictions_to_disk: True # True or False
 
-test_from_ckpts_parent_dir: logs/20241115_004406_y'(2024)-ImprovedEarlyStop-MultiAlpha/lr_3e-05_bs_16/alpha_4.0 
+test_from_ckpts_parent_dir: logs/20241115_005338_y'(2024,2022)-ImprovedEarlyStop-MultiAlpha/lr_3e-05_bs_16/alpha_0.5 
 # test_from_checkpoint: logs/20241106_203926_y'(2024,2023,2022)-SelectedHparam/seed_42/lightning_logs/version_18054428/checkpoints/epoch=9-step=2590.ckpt
 
 test_data: [2024]

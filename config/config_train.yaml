@@ -2,28 +2,30 @@ debug_mode: False # will run only 1 epoch of training with 1% of training data, 
 
 save_predictions_to_disk: False # True or False
 
-main_label: y' # y' - LLM-GEm; y - vanilla
+main_label: y # y' - LLM-GEm; y - vanilla; y_agentic - agentic approach
 
-train_data: [2024, 2023, 2022] # for y or y'
-train_only_llm_data: [] # for y_llm
+train_data: [2024] # for y or y'
+train_only_llm_data: [2022] # for y_llm
+train_only_llm_portion: 0.3 # 0.1 means 10%  will be used for training
 
-val_data: 2022 # test would be same as val_data as in in-sample setting
+val_data: 2024 # test would be same as val_data as in in-sample setting
 
-expt_name_postfix: Data2022 # postfix to be added on top of main_label, train_data and train_only_llm_data
-overwrite_logging_dir: logs/20241117_234401_y'(2024,2023,2022)-Data2022 
+expt_name_postfix: llm-portion-0.3 # postfix to be added on top of main_label, train_data and train_only_llm_data
+# overwrite_logging_dir: logs/20241117_234401_y'(2024,2023,2022)-Data2022 
 # resume_train_from_checkpoint: logs/20241023_205914_vanilla+2023LLM/lightning_logs/version_17110004/checkpoints/epoch=5-step=378.ckpt
 
-# finetune_from_checkpoint: logs/20241114_153020_y'(2024,2023,2022)-ImprovedEarlyStop/seed_42/lightning_logs/version_18324709/checkpoints/epoch=10-step=2849.ckpt 
+# finetune_from_checkpoint: logs/20241118_182138_y(2024)-y_llm(2022)/lr_3e-05_bs_16/seed_100/lightning_logs/version_18411165/checkpoints/epoch=10-step=2156.ckpt 
 # finetune_lr: 3.0e-6
 
 enable_early_stopping: True
+early_stopping_start_epoch: 5
 
 num_epochs: 20
 
 #### Hyperparameters to search
 # lrs: [1.0e-5, 2.0e-5, 3.0e-5]
 # batch_sizes: [16, 32]
-alphas: [3.0, 3.5, 4.0, 4.5, 5.0]
+# alphas: [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5]
 
 #### Selected hyperparameters
 lrs: [3.0e-5]
@@ -47,3 +49,11 @@ warmup_ratio: 0.06
 # plateau_patience: 1
 # plateau_factor: 0.05
 # plateau_threshold: 1.0e-4
+
+# #### agentic approach
+# updated_train_dl_file: False
+
+# ############ Agentic approach ############
+# noise_level: 0.4
+# num_agents: 3
+# save_agentics_to_disk: True # saves indices and updated train_dl file

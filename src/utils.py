@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import glob
 from omegaconf import OmegaConf
+import warnings
 import lightning as L
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
 from lightning.pytorch.utilities import rank_zero_only
@@ -46,7 +47,7 @@ def get_trainer(config, devices="auto", extra_callbacks=None, enable_checkpointi
 
     if enable_early_stopping:
         early_stopping = DelayedStartEarlyStopping(
-            start_epoch=5,
+            start_epoch=config.early_stopping_start_epoch,
             monitor="val_ccc",
             patience=2,
             mode="max",
@@ -206,12 +207,12 @@ def prepare_train_config(config: OmegaConf) -> OmegaConf:
         config.extra_columns_to_keep_train = []
         train_attr = "train"
         val_attr = "val"
-    elif config.main_label == "y'":
+    elif config.main_label == "y'" or config.main_label == "y_agentic":
         config.extra_columns_to_keep_train = [config.llm_column]
         train_attr = "train_llama"
         val_attr = "val_llama"
     else:
-        raise ValueError(f"main_label must be either y or y'. Found {config.main_label}")
+        raise ValueError(f"main_label must be either y, y' or y_agentic. Found {config.main_label}")
         
     config.train_file_list = []
     for data in config.train_data:
@@ -236,14 +237,12 @@ def prepare_train_config(config: OmegaConf) -> OmegaConf:
     log_info(logger, f"Val data: {config.val_file_list}")
     log_info(logger, f"Test data: {config.test_file_list}")
 
-    import pdb; pdb.set_trace()
-
     config.do_test = True
 
     if config.val_data in [2023, 2022]:
         # only way to test is through CodaLab submission
         config.do_test = False
-    elif "alphas" in config:
+    elif "alphas" in config and config.main_label == "y'":
         # we may not have alpha in normal settings
         if len(config.alphas) > 1:
             config.do_test = False
@@ -266,3 +265,18 @@ def prepare_test_config(config: OmegaConf) -> OmegaConf:
             config.have_label = False
 
     return config
+
+def resolve_num_steps(config: OmegaConf, train_dl) -> tuple:
+        # number of training steps is required for linear scheduler
+    num_training_steps = len(train_dl) * config.num_epochs
+    if "num_warmup_steps" in config:
+        num_warmup_steps = config.num_warmup_steps
+        if num_warmup_steps > config.num_training_steps:
+            raise ValueError("Number of warmup steps cannot be greater than the number of training steps.")
+        if "warmup_ratio" in config:
+            warnings.warn("Both num_warmup_steps and warmup_ratio are provided. Ignoring warmup_ratio.")
+    else:
+        num_warmup_steps = config.warmup_ratio * len(train_dl) * 10 # 10 epochs of warmup calculation, like the RoBERTa paper
+    log_info(logger, f"Number of warmup steps: {num_warmup_steps}")
+
+    return num_training_steps, num_warmup_steps

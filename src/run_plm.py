@@ -5,40 +5,31 @@ import lightning as L
 from omegaconf import OmegaConf
 import warnings
 import glob
+import torch
 
-from utils import log_info, resolve_logging_dir, process_seedwise_metrics, prepare_train_config, get_trainer
+from utils import log_info, resolve_logging_dir, process_seedwise_metrics, prepare_train_config, get_trainer, resolve_num_steps
 from model import init_model, load_model_from_ckpt
 from preprocess import DataModuleFromRaw
 from test import test_plm
 
 logger = logging.getLogger(__name__)
 
-def _train_validate_plm(config: OmegaConf) -> tuple:
+def _train_validate_plm(config: OmegaConf, train_dl: torch.utils.data.DataLoader = None) -> tuple:
     datamodule = DataModuleFromRaw(config)
-    
-    if os.path.exists(config.logging_dir):
-        log_info(logger, f"Seed-level logging directory already exists: {config.logging_dir}. So, validating on the saved ckpt...")
-        # don't need the train dl
-    else:
+    # if os.path.exists(config.logging_dir):
+    #     log_info(logger, f"Seed-level logging directory already exists: {config.logging_dir}. So, validating on the saved ckpt...")
+    #     # don't need the train dl --> need for tine-tuning 
+    if train_dl is None:
         train_dl = datamodule.get_train_dl(data_path_list=config.train_file_list)
+    else:
+        log_info(logger, "Training data loader is provided. So, skipping the training data loader creation.")
     
     val_dl = datamodule.get_val_dl(data_path_list=config.val_file_list)
 
     trainer = get_trainer(config, enable_early_stopping=config.enable_early_stopping)
 
     if config.lr_scheduler_type == "linear" or config.lr_scheduler_type == "polynomial":
-        # number of training steps is required for linear scheduler
-        config.num_training_steps = len(train_dl) * config.num_epochs
-        if "num_warmup_steps" in config:
-            config.num_warmup_steps = config.num_warmup_steps
-            if config.num_warmup_steps > config.num_training_steps:
-                raise ValueError("Number of warmup steps cannot be greater than the number of training steps.")
-            if "warmup_ratio" in config:
-                warnings.warn("Both num_warmup_steps and warmup_ratio are provided. Ignoring warmup_ratio.")
-        else:
-            config.num_warmup_steps = config.warmup_ratio * config.num_training_steps
-            config.num_warmup_steps = config.warmup_ratio * len(train_dl) * 10 # 10 epochs of warmup calculation, like the RoBERTa paper
-        log_info(logger, f"Number of warmup steps: {config.num_warmup_steps}")
+        config.num_training_steps, config.num_warmup_steps = resolve_num_steps(config, train_dl)
 
     if config.lr_find: # didn't work well in a casual run
         model = init_model(config)
@@ -117,7 +108,7 @@ def _train_validate_plm(config: OmegaConf) -> tuple:
 
     return best_model_ckpt, metrics
 
-def _seeds_sweep(config: OmegaConf, do_test: bool = False) -> None:
+def _seeds_sweep(config: OmegaConf, do_test: bool = False, train_dl: torch.utils.data.DataLoader = None) -> None:
     parent_logging_dir = config.logging_dir
     results = []
     for seed in config.seeds:
@@ -125,13 +116,9 @@ def _seeds_sweep(config: OmegaConf, do_test: bool = False) -> None:
         log_info(logger, f"Current seed: {config.seed}")
         config.logging_dir = os.path.join(parent_logging_dir, f"seed_{config.seed}")
 
-        # if os.path.exists(config.logging_dir):
-        #     log_info(logger, f"Seed-level logging directory already exists: {config.logging_dir}. So, skipping this seed {seed}.")
-        #     continue
-
         L.seed_everything(config.seed)
 
-        best_model_ckpt, metrics = _train_validate_plm(config)
+        best_model_ckpt, metrics = _train_validate_plm(config, train_dl=train_dl)
         
         if do_test:
             # subsequent testing
@@ -177,7 +164,10 @@ if __name__ == "__main__":
         config.seeds = config.seeds[:2] # reduce the number of seeds for debugging
         config.logging_dir = "./tmp"
         log_info(logger, f"Debug mode is on. Using {config.logging_dir} for storing log files.")
-    
+        if config.main_label == "y_agentic":
+            config.num_agents = 2
+            log_info(logger, f"Debug mode is on. Using {config.num_agents} agents for agentic noise removal.")
+
     if "overwrite_logging_dir" in config:
         log_info(logger, f"Using overwrite_logging_dir {config.overwrite_logging_dir}")
         log_info(logger, "MAKE SURE you DELETE the last directory manually which was not trained for all epochs.")
@@ -203,5 +193,27 @@ if __name__ == "__main__":
                 log_info(logger, f"Current lr: {config.lr}, Current batch_size: {config.batch_size}")
                 config.logging_dir = os.path.join(parent_logging_dir, f"lr_{config.lr}_bs_{config.batch_size}")
                 _alpha_sweep(config, do_test=config.do_test)
+    
+    elif config.main_label == "y_agentic":
+        from agentic_noise_removal import agentic_noise_removal
+        if config.updated_train_dl_file:
+            assert os.path.exists(config.updated_train_dl_file), f"Updated train_dl file not found at {config.updated_train_dl_file}"
+            train_dl = torch.load(config.updated_train_dl_file, weights_only=False)
+            log_info(logger, f"Loaded updated train_dl from {config.updated_train_dl_file}")
+            config.logging_dir = os.path.dirname(config.updated_train_dl_file)
+        else:
+            log_info(logger, "No updated train_dl file found. So, training from scratch.")
+            config.batch_size = config.batch_sizes[0] # only the first batch_size is used for agentic
+            config.lr = config.lrs[0] # only the first lr is used for agentic
+            train_dl = agentic_noise_removal(config)
+
+        parent_logging_dir = config.logging_dir
+        for lr in config.lrs:
+            config.lr = lr
+            for batch_size in config.batch_sizes:
+                config.batch_size = batch_size
+                log_info(logger, f"Current lr: {config.lr}, Current batch_size: {config.batch_size}")
+                config.logging_dir = os.path.join(parent_logging_dir, f"lr_{config.lr}_bs_{config.batch_size}")
+                _seeds_sweep(config, do_test=config.do_test, train_dl=train_dl)
     else:
         raise ValueError(f"main_label must be either y or y'. Found {config.main_label}")
