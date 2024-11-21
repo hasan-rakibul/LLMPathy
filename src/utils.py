@@ -2,7 +2,6 @@ import os
 from typing import List
 import datetime
 import logging
-import matplotlib.pyplot as plt
 import pandas as pd
 import glob
 from omegaconf import OmegaConf
@@ -10,8 +9,6 @@ import warnings
 import lightning as L
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
 from lightning.pytorch.utilities import rank_zero_only
-import scienceplots
-plt.style.use(['science', 'tableau-colorblind10'])
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -177,25 +174,6 @@ def log_info(logger, msg):
 def log_debug(logger, msg):
     logger.debug(msg)
 
-def plot(x, y, y2=None, xlabel=None, ylabel=None, legend=[], save=False, filename=None):
-    """Plot data points"""
-    plt.style.use(['science'])
-    fig, ax = plt.subplots(1, 1)
-    
-    ax.plot(x, y)
-    if y2 is not None:
-        ax.plot(x, y2)
-    
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
-    ax.legend(legend)
-    
-    if save:
-        plt.savefig(fname=filename+'.pdf', format='pdf', bbox_inches='tight')
-        print(f"Saved as {filename}.pdf")
-        
-    fig.show()
-
 def prepare_train_config(config: OmegaConf) -> OmegaConf:
 
     config.expt_name = f"{config.main_label}({','.join([str(data) for data in config.train_data])})"
@@ -227,10 +205,9 @@ def prepare_train_config(config: OmegaConf) -> OmegaConf:
         if data != config.val_data:
             config.train_file_only_LLM_list.append(config[data].val_llama)
 
-
     config.val_file_list = [config[config.val_data].val]
     config.test_file_list = [config[config.val_data].test]
-    
+
     log_info(logger, f"Experiment name: {config.expt_name}")
     log_info(logger, f"Train data: {config.train_file_list}")
     log_info(logger, f"Train only LLM data: {config.train_file_only_LLM_list}")
@@ -249,6 +226,8 @@ def prepare_train_config(config: OmegaConf) -> OmegaConf:
     elif len(config.lrs) > 1 or len(config.batch_sizes) > 1:
         # means hyperparameter tuning
         config.do_test = False
+
+    config.make_ready_for_submission = False
 
     return config
 

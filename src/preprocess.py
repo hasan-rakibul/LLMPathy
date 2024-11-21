@@ -213,9 +213,10 @@ class DataModuleFromRaw:
 
         # all_data.to_csv(f"tmp/all_{mode}_data.tsv", sep='\t', index=False) # save the data for debugging
 
-        if self.config.main_label == "y_agentic":
-            # add sample_id column
-            all_data['sample_id'] = range(len(all_data))     
+        if "main_label" in self.config: # doesn't have (need) this in the test config
+            if self.config.main_label == "y_agentic":
+                # add sample_id column
+                all_data['sample_id'] = range(len(all_data))     
 
         all_data_hf = Dataset.from_pandas(all_data, preserve_index=False) # convert to huggingface dataset
         

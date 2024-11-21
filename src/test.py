@@ -3,7 +3,6 @@ import transformers
 import lightning as L
 from omegaconf import OmegaConf
 from preprocess import DataModuleFromRaw
-import zipfile
 import logging
 import torch
 from torchmetrics.functional import pearson_corrcoef, concordance_corrcoef, mean_squared_error
@@ -14,13 +13,7 @@ from model import load_model_from_ckpt
 
 logger = logging.getLogger(__name__)
 
-def _submission_ready(save_dir: str) -> None:
-    # we need to zip the predictions
-    with zipfile.ZipFile(f"{save_dir}/predictions.zip", "w") as zf:
-        zf.write(f"{save_dir}/test-predictions_EMP.tsv", arcname="predictions_EMP.tsv")
-        log_info(logger, f"Zipped predictions to {save_dir}/predictions.zip")
-
-def test_plm(config: OmegaConf, make_ready_for_submission: bool = False, have_label: bool = True) -> dict:
+def test_plm(config: OmegaConf, have_label: bool = True) -> dict:
     assert os.path.exists(config.test_from_checkpoint), "valid test_from_checkpoint is required for test_mode"
     
     datamodule = DataModuleFromRaw(config)
@@ -39,9 +32,6 @@ def test_plm(config: OmegaConf, make_ready_for_submission: bool = False, have_la
 
     trainer.test(model=model, dataloaders=test_dl, verbose=True)
 
-    if make_ready_for_submission:
-        _submission_ready(save_dir=config.logging_dir)
-
     if have_label:
         # metrics calculation is possibel only if we have labels
         metrics = {
@@ -54,7 +44,7 @@ def test_plm(config: OmegaConf, make_ready_for_submission: bool = False, have_la
 
     return metrics
 
-def _test_multi_seeds(ckpt_parent_dir: str, config: OmegaConf, make_ready_for_submission: bool = False, have_label: bool = True) -> None:
+def _test_multi_seeds(ckpt_parent_dir: str, config: OmegaConf, have_label: bool = True) -> None:
     results = []
 
     for seed in config.seeds:
@@ -62,7 +52,7 @@ def _test_multi_seeds(ckpt_parent_dir: str, config: OmegaConf, make_ready_for_su
         log_info(logger, f"Current seed: {config.seed}")
         config.test_from_checkpoint = resolve_seed_wise_checkpoint(ckpt_parent_dir, seed)
         config.logging_dir = ckpt_parent_dir
-        test_metrics = test_plm(config, make_ready_for_submission, have_label)
+        test_metrics = test_plm(config, have_label)
         test_metrics["seed"] = seed
         log_info(logger, f"Metrics: {test_metrics}")
         results.append(test_metrics)
@@ -114,10 +104,10 @@ if __name__ == "__main__":
         log_info(logger, f"Doing a single test using {config.test_from_checkpoint}")
         log_info(logger, f"Normal testing on {config.test_file_list}")
         config.logging_dir = resolve_logging_dir(config) # update customised logging_dir
-        test_plm(config, config.make_ready_for_submission, config.have_label)
+        test_plm(config, config.have_label)
     elif "test_from_ckpts_parent_dir" in config:
         log_info(logger, f"Multi-seed testing from {config.test_from_ckpts_parent_dir}")
-        _test_multi_seeds(config.test_from_ckpts_parent_dir, config, config.make_ready_for_submission)
+        _test_multi_seeds(config.test_from_ckpts_parent_dir, config)
     elif "test_zero_shot_file" in config:
         log_info(logger, f"Zero shot testing on {config.test_zero_shot_file}")
         if "val_goldstandard_file" in config:

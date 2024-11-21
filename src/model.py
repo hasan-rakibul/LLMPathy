@@ -7,6 +7,7 @@ import os
 import logging
 import pandas as pd
 import torch.nn as nn
+import zipfile
 from omegaconf import OmegaConf
 from utils import log_info
 
@@ -94,6 +95,11 @@ class LightningPLM(L.LightningModule):
             sep='\t', index=None, header=None
         )
         log_info(logger, f'Saved predictions to {self.config.logging_dir}/{mode}-predictions_EMP.tsv')
+        
+        if self.config.make_ready_for_submission:
+            with zipfile.ZipFile(f"{self.config.logging_dir}/predictions.zip", "w") as zf:
+                zf.write(f"{self.config.logging_dir}/{mode}-predictions_EMP.tsv", arcname="predictions_EMP.tsv")
+                log_info(logger, f"Zipped predictions to {self.config.logging_dir}/predictions.zip")
         
     def training_step(self, batch, batch_idx):
         outputs = self(batch)
