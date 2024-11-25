@@ -151,6 +151,14 @@ def process_seedwise_metrics(results: List, save_as: str) -> None:
     std_row = results_df.std(numeric_only=True).round(3)
     median_row = results_df.median(numeric_only=True).round(3)
     
+    best_scores = pd.DataFrame(index=["best"], columns=results_df.columns)
+    for col in results_df.columns:
+        if col.endswith("_rmse"):
+            best_scores.loc["best", col] = results_df[col].min()
+        else:
+            best_scores.loc["best", col] = results_df[col].max()
+    best_row = best_scores.loc["best", :].round(3)
+    
     # Assign a label to identify each row
     mean_row.name = "mean"
     std_row.name = "std"
@@ -163,8 +171,8 @@ def process_seedwise_metrics(results: List, save_as: str) -> None:
 
     # print the result, in LaTeX-table style
     log_info(logger, " & ".join(results_df.columns))
-    log_info(logger, " & ".join([f"${mean:.3f}\\pm {std:.3f}$"\
-            for mean, std in zip(mean_row, std_row)]))
+    log_info(logger, "\nMedian(Best)")
+    log_info(logger, " & ".join([f"${median}({best})$" for median, best in zip(median_row, best_row)]))
 
 @rank_zero_only
 def log_info(logger, msg):

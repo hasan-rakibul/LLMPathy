@@ -96,10 +96,19 @@ class LightningPLM(L.LightningModule):
         )
         log_info(logger, f'Saved predictions to {self.config.logging_dir}/{mode}-predictions_EMP.tsv')
         
+        if "test_from_ckpts_parent_dir" in self.config:
+            # need to reconfigure the logging dir for submission files
+            zip_save_dir = os.path.join(self.config.logging_dir, f"seed_{self.config.seed}")
+            os.makedirs(zip_save_dir, exist_ok=True)
+        else:
+            zip_save_dir = self.config.logging_dir
+
         if self.config.make_ready_for_submission:
-            with zipfile.ZipFile(f"{self.config.logging_dir}/predictions.zip", "w") as zf:
+            with zipfile.ZipFile(f"{zip_save_dir}/predictions.zip", "w") as zf:
                 zf.write(f"{self.config.logging_dir}/{mode}-predictions_EMP.tsv", arcname="predictions_EMP.tsv")
                 log_info(logger, f"Zipped predictions to {self.config.logging_dir}/predictions.zip")
+            # remove the file as we have zipped it and the raw file doesn't matter anymore
+            os.remove(f"{self.config.logging_dir}/{mode}-predictions_EMP.tsv")
         
     def training_step(self, batch, batch_idx):
         outputs = self(batch)

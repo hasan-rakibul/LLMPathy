@@ -53,12 +53,16 @@ def _test_multi_seeds(ckpt_parent_dir: str, config: OmegaConf, have_label: bool 
         config.test_from_checkpoint = resolve_seed_wise_checkpoint(ckpt_parent_dir, seed)
         config.logging_dir = ckpt_parent_dir
         test_metrics = test_plm(config, have_label)
-        test_metrics["seed"] = seed
-        log_info(logger, f"Metrics: {test_metrics}")
-        results.append(test_metrics)
+        
+        if have_label:
+            # then we have metrics
+            test_metrics["seed"] = seed
+            log_info(logger, f"Metrics: {test_metrics}")
+            results.append(test_metrics)
 
-    save_as = os.path.join(ckpt_parent_dir, "results_test.csv")
-    process_seedwise_metrics(results, save_as)
+    if have_label:
+        save_as = os.path.join(ckpt_parent_dir, "results_test.csv")
+        process_seedwise_metrics(results, save_as)
 
 def _test_zero_shot(filepath: str, val_goldstandard_filepath: str = None) -> None:
     df = read_file(filepath)
@@ -107,7 +111,7 @@ if __name__ == "__main__":
         test_plm(config, config.have_label)
     elif "test_from_ckpts_parent_dir" in config:
         log_info(logger, f"Multi-seed testing from {config.test_from_ckpts_parent_dir}")
-        _test_multi_seeds(config.test_from_ckpts_parent_dir, config)
+        _test_multi_seeds(config.test_from_ckpts_parent_dir, config, have_label=config.have_label)
     elif "test_zero_shot_file" in config:
         log_info(logger, f"Zero shot testing on {config.test_zero_shot_file}")
         if "val_goldstandard_file" in config:
