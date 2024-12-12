@@ -11,7 +11,7 @@ import matplotlib.colors as mcolors
 import scienceplots
 plt.style.use(['science', 'tableau-colorblind10'])
 
-from utils import read_file
+from ..utils import read_file
 
 def plot(x, y, y2=None, xlabel=None, ylabel=None, legend=[], save=False, filename=None):
     """Plot data points"""
