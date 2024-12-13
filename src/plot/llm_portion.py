@@ -7,7 +7,9 @@ import scienceplots
 plt.style.use(['science', 'tableau-colorblind10'])
 
 def plot_llm_portion_sweep(parent_dir: str) -> None:
-    glob_str = f"{parent_dir}/**/**-llm-portion-**/**/results.csv"
+    expt = "llm-portion"
+
+    glob_str = f"{parent_dir}/**/**-{expt}-**/**/results.csv"
     result_csvs = glob.glob(glob_str, recursive=True)
 
     # remove finetunes
@@ -28,6 +30,10 @@ def plot_llm_portion_sweep(parent_dir: str) -> None:
     mean_df = mean_df.set_index("new_samples")
     std_df = std_df.set_index("new_samples")
     median_df = median_df.set_index("new_samples")
+
+    print(f"Best Median PCC: {median_df['test_pcc'].max()}")
+    print(f"Best Median CCC: {median_df['test_ccc'].max()}")
+
     _, ax = plt.subplots(figsize=(5, 3))
 
     lines = []
@@ -35,7 +41,7 @@ def plot_llm_portion_sweep(parent_dir: str) -> None:
     for col in median_df.columns:
         y = median_df[col]
         # std = std_df[col]
-        if col in ["val_pcc", "val_ccc"]:
+        if col in ["test_pcc", "test_ccc"]:
             lines.append(ax.plot(x, y, marker=".", label=col))
             # Plot the shaded area representing the standard deviations
             # _ = ax.fill_between(x, y - std, y + std, alpha=0.1)
@@ -61,7 +67,8 @@ def plot_llm_portion_sweep(parent_dir: str) -> None:
     ax.text(50, baseline_ccc+0.007, 'Baseline CCC', color=lines[1].get_color(), fontsize=9, horizontalalignment='center', verticalalignment='center')
 
     # Adding labels and title
-    ax.set_xlabel(r'\% New Samples Labelled by LLM')
+    # ax.set_xlabel(r'\% New Samples Labelled by LLM')
+    ax.set_xlabel(r'Additional \% of NewsEmpathy2022 Data Labelled by LLM')
     ax.set_xticks(x)
     ax.set_ylabel(r'Median Score')
     # ax2.set_ylabel(r'RMSE (Mean $\pm$ SD)')
@@ -72,7 +79,7 @@ def plot_llm_portion_sweep(parent_dir: str) -> None:
     # ax.axvline(x=len(mean_df) - 1, color='red', linestyle='--')
     # ax.text(0.975, 0.5, 'Crowdsourced', color='red', rotation=90, fontsize=10, horizontalalignment='center', verticalalignment='center',transform=ax.transAxes)
 
-    plt.savefig(os.path.join(parent_dir, "metrics-vs-llm-portion.pdf"), bbox_inches='tight')
+    plt.savefig(os.path.join(parent_dir, f"metrics-vs-{expt}.pdf"), bbox_inches='tight')
     # plt.close()
 
 

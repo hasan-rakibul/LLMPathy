@@ -193,6 +193,8 @@ class DataModuleFromRaw:
         for data_path in data_path_list:
             data = self._raw_to_processed(data_path, have_label, mode)
             if 'all_data' in locals():
+                # log_info(logger, f"Taking {self.config.train_human_portion} portion of the data from {data_path}.\n")
+                # data = data.sample(frac=self.config.train_human_portion, random_state=self.config.seed)
                 all_data = pd.concat([all_data, data])
             else:
                 all_data = data
@@ -203,7 +205,9 @@ class DataModuleFromRaw:
                 # assuming no have_label, as we are using LLM labels as the main labels
                 data = self._raw_to_processed(data_path, have_label=True, mode="train_only_LLM")
                 log_info(logger, f"Taking {self.config.train_only_llm_portion} portion of the data from {data_path} for training only LLM.\n")
-                data = data.sample(frac=self.config.train_only_llm_portion, random_state=self.config.seed)
+                if self.config.train_only_llm_portion < 1:
+                    # not sampleing all the data to be consistent with earlier experiment
+                    data = data.sample(frac=self.config.train_only_llm_portion, random_state=self.config.seed)
                 log_info(logger, f"Number of only-LLM samples being used: {len(data)}\n")
                 all_data = pd.concat([all_data, data])
 
