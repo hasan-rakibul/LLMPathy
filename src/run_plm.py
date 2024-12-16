@@ -152,7 +152,8 @@ def _alpha_sweep(config: OmegaConf, do_test: bool) -> None:
 
 if __name__ == "__main__":
     transformers.logging.set_verbosity_error()
-    config_train = OmegaConf.load("config/config_train.yaml")
+    # config_train = OmegaConf.load("config/config_train.yaml")
+    config_train = OmegaConf.load("config/Giorgi2024Findings.yaml")
     config_common = OmegaConf.load("config/config_common.yaml")
 
     config = OmegaConf.merge(config_common, config_train)

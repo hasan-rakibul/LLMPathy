@@ -74,9 +74,17 @@ def get_trainer(config, devices="auto", extra_callbacks=None, enable_checkpointi
         #     save_top_k=1,
         #     mode="min"
         # )
-        checkpoint = ModelCheckpoint(
-            save_top_k=1 # saves the last checkpoint; no need to save_last=True as it will save another checkpoint unnecessarily
-        )
+        if config.expt_name_postfix == "Giorgi2024Findings":
+            log_info(logger, "Using vall_pcc to reproduce Giorgi2024Findings")
+            checkpoint = ModelCheckpoint(
+                monitor="val_pcc",
+                save_top_k=1,
+                mode="max"
+            )
+        else:
+            checkpoint = ModelCheckpoint(
+                save_top_k=1 # saves the last checkpoint; no need to save_last=True as it will save another checkpoint unnecessarily
+            )
         
         callbacks.append(checkpoint)
         

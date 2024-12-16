@@ -1,0 +1,34 @@
+debug_mode: False # will run only 1 epoch of training with 1% of training data, saves logs in tmp/ directory
+
+save_predictions_to_disk: False # True or False
+
+main_label: y
+
+train_data: [2024, 2023, 2022] # for y or y'
+train_human_portion: 1.0 # 0.8 means additional 80% of train_data[1:] will be used for training. First element of train_data is always 100% used for training.
+train_only_llm_data: []
+
+val_data: 2024 # test would be same as val_data as in in-sample setting
+
+expt_name_postfix: Giorgi2024Findings # postfix to be added on top of main_label, train_data and train_only_llm_data
+
+enable_early_stopping: False
+
+enable_checkpointing: True
+
+num_epochs: 30
+
+lrs: [1.0e-5] # From Omitaomu et a. (2022) as Giorgi et al. (2024) mentioned following them
+batch_sizes: [32] # Again, from Omitaomu et a. (2022)
+
+logging_dir: ./logs
+freeze_plm: False
+lr_find: False  # it didn't work for me
+
+# Using PyTorch defaults, as Giorgi et al. (2024) didn't mention any specific values, nor did Omitaomu et al. (2022)
+adamw_beta1: 0.9
+adamw_beta2: 0.999
+adamw_eps: 1.0e-08
+adamw_weight_decay: 0.01
+
+lr_scheduler_type: False
