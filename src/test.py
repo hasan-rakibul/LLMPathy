@@ -64,7 +64,7 @@ def _test_multi_seeds(ckpt_parent_dir: str, config: OmegaConf, have_label: bool 
         save_as = os.path.join(ckpt_parent_dir, "results_test.csv")
         process_seedwise_metrics(results, save_as)
 
-def _test_zero_shot(filepath: str, val_goldstandard_filepath: str = None) -> None:
+def _test_zero_shot(filepath: str, val_goldstandard_filepath: str = None, llm_column: str = "llm_empathy") -> None:
     df = read_file(filepath)
     if val_goldstandard_filepath is not None:
         goldstandard = pd.read_csv(
@@ -76,12 +76,12 @@ def _test_zero_shot(filepath: str, val_goldstandard_filepath: str = None) -> Non
         goldstandard = goldstandard.rename(columns={0: "empathy"})
         df = pd.concat([df, goldstandard], axis=1)
 
-    assert df["llm_empathy"].shape[0] == df["empathy"].shape[0], "The number of predictions and ground truth should be same"
-    df = df[["empathy", "llm_empathy"]]
+    assert df[llm_column].shape[0] == df["empathy"].shape[0], "The number of predictions and ground truth should be same"
+    df = df[["empathy", llm_column]]
     log_info(logger, f"NaNs in the dataframe: {df.isna().sum().sum()}. Dropping them ...")
     df = df.dropna()
     y = torch.tensor(df["empathy"].to_numpy(), dtype=torch.float64)
-    y_hat = torch.tensor(df["llm_empathy"].to_numpy(), dtype=torch.float64)
+    y_hat = torch.tensor(df[llm_column].to_numpy(), dtype=torch.float64)
     pcc = pearson_corrcoef(y_hat, y).item()
     ccc = concordance_corrcoef(y_hat, y).item()
     rmse = mean_squared_error(y_hat, y, squared=False).item()
@@ -115,8 +115,8 @@ if __name__ == "__main__":
     elif "test_zero_shot_file" in config:
         log_info(logger, f"Zero shot testing on {config.test_zero_shot_file}")
         if "val_goldstandard_file" in config:
-            _test_zero_shot(config.test_zero_shot_file, config.val_goldstandard_file)
+            _test_zero_shot(config.test_zero_shot_file, config.val_goldstandard_file, config.llm_column)
         else:
-            _test_zero_shot(config.test_zero_shot_file)
+            _test_zero_shot(config.test_zero_shot_file, llm_column=config.llm_column)
     else:
         raise ValueError("Either test_file_list or test_zero_shot_file should be present in config")

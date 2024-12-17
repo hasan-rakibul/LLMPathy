@@ -10,7 +10,9 @@ scienceplots
 omegaconf
 ipykernel # for jupyter notebook
 scipy
-scikit-learn 
+scikit-learn
+groq
+tenacity 
 
 # for Optuna hyperparameter optimisation
 #optuna
