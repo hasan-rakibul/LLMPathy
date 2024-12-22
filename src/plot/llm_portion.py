@@ -41,8 +41,11 @@ def plot_llm_portion_sweep(parent_dir: str) -> None:
     for col in median_df.columns:
         y = median_df[col]
         # std = std_df[col]
-        if col in ["test_pcc", "test_ccc"]:
+        if col in ["test_pcc"]:
             lines.append(ax.plot(x, y, marker=".", label=col))
+        if col in ["test_ccc"]:
+            lines.append(ax.plot(x, y, marker="x", label=col, color="black"))
+            
             # Plot the shaded area representing the standard deviations
             # _ = ax.fill_between(x, y - std, y + std, alpha=0.1)
         # else:

@@ -59,9 +59,9 @@ def _print_significance(file_x: str, file_y: str, metrics: list) -> None:
         _t_test(metric_x, pcc_y)
 
 def _plot_significance(file_x: str, file_y: str, file_z: str, metrics: list) -> None:
-    expt_x = "Baseline"
-    expt_y = "Mixed labels"
-    expt_z = "Additional data labelled by LLM"
+    expt_x = "Existing data"
+    expt_y = "LLM-based label noise reduction"
+    expt_z = "Existing data + LLM-labelled extra data"
     # Prepare data for plotting
     data = []
     for metric in metrics:
@@ -102,6 +102,7 @@ def _plot_significance(file_x: str, file_y: str, file_z: str, metrics: list) -> 
 
     ax.set_ylabel("Metric Value")
     ax.set_xlabel("Metric")
+    ax.set_xticklabels([r"PCC $\uparrow$", r"CCC $\uparrow$", r"RMSE $\downarrow$"])
     plt.legend(loc="upper left")
     plt.tight_layout()
     plt.show()
@@ -110,7 +111,8 @@ def _plot_significance(file_x: str, file_y: str, file_z: str, metrics: list) -> 
 if __name__ == "__main__":
     file_x = "logs/20241115_004656_y(2024)-ImprovedEarlyStop/lr_3e-05_bs_16/results_test.csv"
     file_y = "logs/20241115_004406_y'(2024)-ImprovedEarlyStop-MultiAlpha/lr_3e-05_bs_16/alpha_3.5/results_test.csv"
-    file_z = "logs/20241118_182138_y(2024)-y_llm(2022)-llm-portion-1.0/lr_3e-05_bs_16/results_test.csv"
+    # file_z = "logs/20241118_182138_y(2024)-y_llm(2022)-llm-portion-1.0/lr_3e-05_bs_16/results_test.csv"
+    file_z = "logs/20241116_021714_y(2024)-y_llm(2022)-llm-portion-1.0/lr_3e-05_bs_16/results_test.csv"
     metrics = ["pcc", "ccc", "rmse"]
     # _print_significance(file_x, file_y, metrics)
     _plot_significance(file_x, file_y, file_z, metrics)
