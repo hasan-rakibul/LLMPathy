@@ -102,7 +102,9 @@ if __name__ == "__main__":
     config_common = OmegaConf.load("config/config_common.yaml")
     config = OmegaConf.merge(config_common, config_test)
 
-    config = prepare_test_config(config)
+    if not "test_zero_shot_file" in config:
+        # don't need config setups for zero shot testing
+        config = prepare_test_config(config)
     
     if "test_from_checkpoint" in config:
         log_info(logger, f"Doing a single test using {config.test_from_checkpoint}")

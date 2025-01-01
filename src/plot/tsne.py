@@ -86,7 +86,7 @@ def _get_embeddings_additional(config, ckpt_path, n_tsne = 3):
         n_components=n_tsne,
         perplexity=30,
         random_state=config.seed,
-        # method="exact",
+        method="exact",
         n_jobs=-1,
         verbose=1
     )
@@ -133,11 +133,8 @@ def _plot_tsne3d(config, file_base: list, file_mixed: list, ckpt_path_base: str,
         ax.set_ylabel("t-SNE 2")
         ax.set_zlabel("t-SNE 3")
 
-    cbar = fig.colorbar(sc_base, ax=[ax1, ax2, ax3], orientation="vertical", aspect=50, pad=0.07, location="right", shrink=0.7)
+    cbar = fig.colorbar(sc_base, ax=[ax1, ax2, ax3], aspect=50, pad=0.07, location="right", shrink=0.7)
     cbar.set_label("Empathy score")
-
-    # plt.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.05)
-    # fig.tight_layout()
 
     plt.savefig("logs/tsne-3d.pdf")
 

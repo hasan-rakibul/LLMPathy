@@ -1,8 +1,8 @@
 #!/bin/bash
  
-#SBATCH --job-name=RunPLM2022
-#SBATCH --output=log_slurm/%x_%j.out
-#SBATCH --time=8:00:00
+#SBATCH --job-name=RunPLM
+#SBATCH --output=log_slurm/%j_%x.out
+#SBATCH --time=6:00:00
 #SBATCH --nodes=1
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:1

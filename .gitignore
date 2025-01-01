@@ -5,6 +5,7 @@ output/
 tmp/
 
 src/scratch.py
+src/ucvme/
 scratch.ipynb
 notes.md
 # UCVME

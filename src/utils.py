@@ -203,8 +203,9 @@ def prepare_train_config(config: OmegaConf) -> OmegaConf:
         val_attr = "val"
     elif config.main_label == "y'" or config.main_label == "y_agentic":
         config.extra_columns_to_keep_train = [config.llm_column]
-        train_attr = "train_llama"
-        val_attr = "val_llama"
+        train_attr = f"train_{config.llm}"
+        val_attr = "val"
+        # val_attr = "val_llama"
     else:
         raise ValueError(f"main_label must be either y, y' or y_agentic. Found {config.main_label}")
         
@@ -216,10 +217,12 @@ def prepare_train_config(config: OmegaConf) -> OmegaConf:
             config.train_file_list.append(getattr(config[data], val_attr))
 
     config.train_file_only_LLM_list = []
+    train_attr = f"train_{config.llm}"
+    val_attr = f"val_{config.llm}"
     for data in config.train_only_llm_data:
-        config.train_file_only_LLM_list.append(config[data].train_llama)
+        config.train_file_only_LLM_list.append(getattr(config[data], train_attr))
         if data != config.val_data:
-            config.train_file_only_LLM_list.append(config[data].val_llama)
+            config.train_file_only_LLM_list.append(getattr(config[data], val_attr))
 
     config.val_file_list = [config[config.val_data].val]
     config.test_file_list = [config[config.val_data].test]

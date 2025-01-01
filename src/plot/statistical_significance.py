@@ -59,9 +59,9 @@ def _print_significance(file_x: str, file_y: str, metrics: list) -> None:
         _t_test(metric_x, pcc_y)
 
 def _plot_significance(file_x: str, file_y: str, file_z: str, metrics: list) -> None:
-    expt_x = "Existing data"
-    expt_y = "LLM-based label noise reduction"
-    expt_z = "Existing data + LLM-labelled extra data"
+    expt_x = "Crowdsourced labels"
+    expt_y = "Crowdsourced \& LLM mixed"
+    expt_z = "Crowdsourced + LLM-labelled extra data"
     # Prepare data for plotting
     data = []
     for metric in metrics:
@@ -92,9 +92,9 @@ def _plot_significance(file_x: str, file_y: str, file_z: str, metrics: list) -> 
         (("PCC", expt_x), ("PCC", expt_z)),
         (("CCC", expt_x), ("CCC", expt_z)),
         (("RMSE", expt_x), ("RMSE", expt_z)),
-        (("PCC", expt_y), ("PCC", expt_z)),
-        (("CCC", expt_y), ("CCC", expt_z)),
-        (("RMSE", expt_y), ("RMSE", expt_z)),
+        # (("PCC", expt_y), ("PCC", expt_z)),
+        # (("CCC", expt_y), ("CCC", expt_z)),
+        # (("RMSE", expt_y), ("RMSE", expt_z)),
     ]
     annotator = Annotator(ax, pairs, data=df, x="Metric", y="Value", hue="Experiment")
     annotator.configure(test="t-test_ind", text_format="star", loc="inside", verbose=2)
@@ -110,7 +110,8 @@ def _plot_significance(file_x: str, file_y: str, file_z: str, metrics: list) -> 
 
 if __name__ == "__main__":
     file_x = "logs/20241115_004656_y(2024)-ImprovedEarlyStop/lr_3e-05_bs_16/results_test.csv"
-    file_y = "logs/20241115_004406_y'(2024)-ImprovedEarlyStop-MultiAlpha/lr_3e-05_bs_16/alpha_3.5/results_test.csv"
+    # file_y = "logs/20241115_004406_y'(2024)-ImprovedEarlyStop-MultiAlpha/lr_3e-05_bs_16/alpha_3.5/results_test.csv"
+    file_y = "logs/20241230_090054_y'(2024)-gpt/lr_3e-05_bs_16/alpha_3.5/results_test.csv"
     # file_z = "logs/20241118_182138_y(2024)-y_llm(2022)-llm-portion-1.0/lr_3e-05_bs_16/results_test.csv"
     file_z = "logs/20241116_021714_y(2024)-y_llm(2022)-llm-portion-1.0/lr_3e-05_bs_16/results_test.csv"
     metrics = ["pcc", "ccc", "rmse"]

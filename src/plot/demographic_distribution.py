@@ -46,7 +46,16 @@ def _demog_mapping_2024(data: pd.DataFrame, demog_columns: list[str]) -> pd.Data
 
     only_demog_map = demog_map[['person_id'] + demog_columns] # person_id is important for mapping
     data = pd.merge(data, only_demog_map, on='person_id', how='left', validate='many_to_one')
-    return data
+
+    age_bins = [18, 24, 30, 40, 50, 60, 100]
+    age_labels =  ["18-24", "25-30", "31-40", "41-50", "51-60", "61+"]
+    data["age_group"] = pd.cut(data["age"], bins=age_bins, labels=age_labels, right=False)
+
+    income_bins = [0, 50000, 100000, 150000, 200000, 1000000]
+    income_labels = ["0-50K", "50-100K", "100-150K", "150-200K", "200K+"]
+    data["income_group"] = pd.cut(data["income"], bins=income_bins, labels=income_labels, right=False)
+
+    return data, age_labels, income_labels
 
 def plt_dmg_dist_single(
         path: str = None,
@@ -90,7 +99,7 @@ def plt_dmg_dist_single(
     demog_columns = continous_features + categorical_features
 
     if requires_demog_mapping:
-        data = _demog_mapping_2024(data, demog_columns)
+        data, _, _ = _demog_mapping_2024(data, demog_columns)
 
     assert set(demog_columns).issubset(data.columns), f"Some/all demographics columns {demog_columns} not found in the data"
 
@@ -198,13 +207,16 @@ def subplts_dmg_dist_bar(mode="all"):
     continous_features = ["age", "income"]
     categorical_features = ["gender", "education", "race"]
     demog_columns = continous_features + categorical_features
+    new_grp = ["age_group", "income_group"]
 
-    data = _demog_mapping_2024(data, demog_columns)
+    data, age_labels, income_labels = _demog_mapping_2024(data, demog_columns)
 
     possible_categories = {
         'gender': [1, 2, 5],
         'education': [1, 2, 3, 4, 5, 6, 7],
-        'race': [1, 2, 3, 4, 5, 6]
+        'race': [1, 2, 3, 4, 5, 6],
+        'age_group': age_labels,
+        'income_group': income_labels
     }
 
     feature_labels_map = {
@@ -219,13 +231,13 @@ def subplts_dmg_dist_bar(mode="all"):
         }
     }
 
-    fig, axes = plt.subplots(1, 3, figsize=(10, 3), sharey=False)
+    fig, axes = plt.subplots(1, 5, figsize=(10, 3), sharey=False)
     fig.tight_layout()
     colourmap = cm.viridis_r
 
     # norm = mcolors.Normalize(vmin=-0.5, vmax=1.0)
-
-    for idx, feature in enumerate(categorical_features):
+    selected_features = categorical_features + new_grp
+    for idx, feature in enumerate(selected_features):
         grp_stats = []
         for feature_value, group in data.groupby(feature):
             sample_size = len(group)
@@ -244,7 +256,8 @@ def subplts_dmg_dist_bar(mode="all"):
             if value not in grp_stats["category"].values:
                 grp_stats.loc[len(grp_stats)] = {"category": value, "ccc": np.nan, "sample_size": 0}
 
-        grp_stats["category"] = grp_stats["category"].map(feature_labels_map[feature])
+        if feature not in new_grp:
+            grp_stats["category"] = grp_stats["category"].map(feature_labels_map[feature])
 
         norm = mcolors.Normalize(vmin=0, vmax=grp_stats["sample_size"].max())
         colours = colourmap(norm(grp_stats["sample_size"]))
@@ -260,10 +273,15 @@ def subplts_dmg_dist_bar(mode="all"):
         )
 
         # TODO: make the labels bold
-        axes[idx].set_xlabel(f"{feature.capitalize()}")
+        if feature == "age_group":
+            axes[idx].set_xlabel("Age (Years)")
+        elif feature == "income_group":
+            axes[idx].set_xlabel("Income (USD)")
+        else:
+            axes[idx].set_xlabel(f"{feature.capitalize()}")
         axes[idx].set_ylabel('CCC')
         axes[idx].set_xticks(grp_stats["category"])
-        axes[idx].set_xticklabels(grp_stats["category"], rotation=40, ha="right")
+        axes[idx].set_xticklabels(grp_stats["category"], rotation=38, ha="right")
 
         ymin, ymax = axes[idx].get_ylim()
         axes[idx].set_ylim(ymin, ymax + 0.1)
@@ -334,7 +352,7 @@ def subplts_dmg_dist_scatter():
     categorical_features = ["gender", "education", "race"]
     demog_columns = continous_features + categorical_features
 
-    data = _demog_mapping_2024(data, demog_columns)
+    data, _, _ = _demog_mapping_2024(data, demog_columns)
 
     possible_categories = {
         'gender': [1, 2, 5],
@@ -393,62 +411,6 @@ def subplts_dmg_dist_scatter():
             axes[idx].set_ylabel("CCC", fontsize=12)
 
     plt.savefig(os.path.join("logs/", f"demographic_distribution_scatter.pdf"), bbox_inches='tight')
-
-
-
-def annotation_consistency() -> pd.DataFrame:
-    tr_24 = pd.read_csv("data/NewsEmp2024/trac3_EMP_train_llama.tsv", sep="\t")
-    tr_23 = pd.read_csv("data/NewsEmp2023/WASSA23_essay_level_with_labels_train_llama.tsv", sep="\t")
-    dv_23 = pd.read_csv("data/NewsEmp2023/WASSA23_essay_level_dev_llama.tsv", sep="\t")
-
-    print(tr_24.shape, tr_23.shape, dv_23.shape)
-
-    common_cols = tr_23.columns.intersection(dv_23.columns)
-    tr_23 = tr_23[common_cols]
-    dv_23 = dv_23[common_cols]
-    tr_dv_23 = pd.concat([tr_23, dv_23], ignore_index=True)
-    print(tr_dv_23.shape)
-
-    tr_24 = tr_24.drop_duplicates(subset=["essay"])
-    tr_dv_23 = tr_dv_23.drop_duplicates(subset=["essay"])
-    print(tr_24.shape, tr_dv_23.shape)
-
-    tr_24 = tr_24.rename(columns={"llm_empathy": "llm_empathy_1"})
-    tr_dv_23 = tr_dv_23.rename(columns={"llm_empathy": "llm_empathy_2"})
-
-    merged_df = pd.merge(tr_24, tr_dv_23, on="essay", how="inner", validate="one_to_one")
-
-    common_cols = tr_24.columns.intersection(tr_dv_23.columns)
-    for col in common_cols:
-        if col == "essay":
-            continue
-
-        if merged_df[col + "_x"].equals(merged_df[col + "_y"]):
-            print(f"{col} is equal")
-            merged_df.drop(col + "_y", axis=1, inplace=True)
-            merged_df.rename(columns={col + "_x": col}, inplace=True)
-        else:
-            print(f"{col} is not equal")
-
-    llm_empathy_1 = torch.tensor(merged_df["llm_empathy_1"].values)
-    llm_empathy_2 = torch.tensor(merged_df["llm_empathy_2"].values)
-
-    pcc = pearson_corrcoef(llm_empathy_1, llm_empathy_2).item()
-    ccc = concordance_corrcoef(llm_empathy_1, llm_empathy_2).item()
-    rmse = mean_squared_error(llm_empathy_1, llm_empathy_2, squared=False).item()
-    pcc = round(pcc, 3)
-    ccc = round(ccc, 3)
-    rmse = round(rmse, 3)
-
-    print(f"PCC: {pcc}, CCC: {ccc}, RMSE: {rmse}")
-
-    merged_df["llm_diff"] = np.abs(merged_df["llm_empathy_1"] - merged_df["llm_empathy_2"])
-    mean_diff = merged_df["llm_diff"].mean().round(3)
-    std_diff = merged_df["llm_diff"].std().round(3)
-    print(f"Difference - Mean: {mean_diff}, Std: {std_diff}")
-
-    return merged_df
-
 
 if __name__ == "__main__":
     # path_2024 = "data/NewsEmp2024/trac3_EMP_train_llama.tsv"
