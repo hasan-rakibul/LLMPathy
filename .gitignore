@@ -19,6 +19,7 @@ log_slurm/
 req_resources.sh
 .make_env_ready.sh
 .declare_api_key.sh
+.rclone.sh
 
 # slurm output files
 *.out

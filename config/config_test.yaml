@@ -1,9 +1,9 @@
 
 eval_batch_size: 32
 
-save_predictions_to_disk: True # True or False
+save_predictions_to_disk: False # True or False; saves raw predictions
 
-test_from_ckpts_parent_dir: logs/20241230_092645_y'(2024)-llama/lr_3e-05_bs_16/alpha_4.5
+test_from_ckpts_parent_dir: logs/20241115_005338_y'(2024,2022)-ImprovedEarlyStop-MultiAlpha/lr_3e-05_bs_16/alpha_1.0
 # test_from_checkpoint: logs/20241118_181830_y(2024,2022)-Data2022/lr_3e-05_bs_16/seed_0/lightning_logs/version_18411149/checkpoints/epoch=10-step=2013.ckpt 
 
 test_data: [2024]
