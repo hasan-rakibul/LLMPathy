@@ -176,7 +176,7 @@ def _plot_tsne3d(config, file_base: list, file_mixed: list, ckpt_path_base: str,
     cbar = fig.colorbar(sc_base, ax=[ax1, ax2, ax3], aspect=50, pad=0.07, location="right", shrink=0.7)
     cbar.set_label("Empathy score")
 
-    # plt.savefig("logs/tsne/tsne-3d.pdf")
+    plt.savefig("logs/tsne/tsne-3d.pdf")
 
 def _plot_tsne2d(config, file_base: list, file_mixed: list, ckpt_path_base: str, ckpt_path_mixed: str):
     embeddings_base, labels_base = _get_embeddings(config, file_base, ckpt_path_base, n_tsne=2)
@@ -228,7 +228,7 @@ def _tsne3d_metrics(embd, label):
     # Convert continuous labels to discrete clusters by binning
     bins = np.linspace(1.0, 7 + 1e-6, num=n_clusters+1) # +1e-6 to avoid the last bin being only 7.0
     label_cluster = np.digitize(label, bins)
-    score = silhouette_score(embd, label_cluster, sample_size=1000, random_state=0) # base and mixed has 1000, so sampling this across all cases
+    score = silhouette_score(embd, label_cluster)
     return round(score, 3)
 
 if __name__ == "__main__":
