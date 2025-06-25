@@ -7,8 +7,12 @@ import numpy as np
 from sklearn.metrics import silhouette_score
 
 import matplotlib.pyplot as plt
-# import scienceplots
-# plt.style.use(['science', 'tableau-colorblind10'])
+
+# the final plot was done in local OpenSUSE
+# since Setonix didn't have latex installed
+# Comment the following to run non-latex version in Setonix
+import scienceplots
+plt.style.use(['science', 'tableau-colorblind10'])
 
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
@@ -138,7 +142,7 @@ def _plot_tsne3d(config, file_base: list, file_mixed: list, ckpt_path_base: str,
     sc_base = ax1.scatter(
         embeddings_base[:, 0], embeddings_base[:, 1], embeddings_base[:, 2], c=labels_base, cmap=cmap, norm=norm
     )
-    ax1.set_title(f"NewsEmp24 Crowdsourced\nSilhouette score: ${score_base:.3f}$")
+    ax1.set_title("NewsEmp24 Crowdsourced\n" + r"\textbf{Silhouette score: $\mathbf{" + f"{score_base}" + r"}$}")
 
     ax2 = fig.add_subplot(132, projection="3d")
     score_mixed = _tsne3d_metrics(embeddings_mixed, labels_mixed)
@@ -147,7 +151,7 @@ def _plot_tsne3d(config, file_base: list, file_mixed: list, ckpt_path_base: str,
     _ = ax2.scatter(
         embeddings_mixed[:, 0], embeddings_mixed[:, 1], embeddings_mixed[:, 2], c=labels_mixed, cmap=cmap, norm=norm
     )
-    ax2.set_title(f"NewsEmp24 LLM\nSilhouette score: ${score_mixed:.3f}$")
+    ax2.set_title("NewsEmp24 LLM\n" + r"\textbf{Silhouette score: $\mathbf{" + f"{score_mixed}" + r"}$}")
 
     ax3 = fig.add_subplot(133, projection="3d")
     score_add = _tsne3d_metrics(embeddings_add, labels_add)
@@ -156,7 +160,7 @@ def _plot_tsne3d(config, file_base: list, file_mixed: list, ckpt_path_base: str,
     _ = ax3.scatter(
         embeddings_add[:, 0], embeddings_add[:, 1], embeddings_add[:, 2], c=labels_add, cmap=cmap, norm=norm
     )
-    ax3.set_title(f"NewsEmp24 Crowdsourced + NewsEmp22 LLM\nSilhouette score: ${score_add:.3f}$")
+    ax3.set_title("NewsEmp24 Crowdsourced + NewsEmp22 LLM\n" + r"\textbf{Silhouette score: $\mathbf{" + f"{score_add}" + r"}$}")
 
 
     for ax in [ax1, ax2, ax3]:
@@ -220,7 +224,7 @@ def _tsne3d_metrics(embd, label):
     bins = np.linspace(1.0, 7 + 1e-6, num=n_clusters+1) # +1e-6 to avoid the last bin being only 7.0
     label_cluster = np.digitize(label, bins)
     score = silhouette_score(embd, label_cluster)
-    return score
+    return round(score, 3)
 
 if __name__ == "__main__":
     os.environ["TOKENIZERS_PARALLELISM"] = "false" 
