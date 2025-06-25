@@ -18,7 +18,6 @@
 + .declare_api_key.sh
 + *.out
 + .python-version
-+ .rclone.sh
 
 # exclue-everything
 - *

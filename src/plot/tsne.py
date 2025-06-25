@@ -62,7 +62,7 @@ def _get_embeddings(config, filepath, ckpt_path, n_tsne = 3):
     )
     tsne_embeddings = tsne.fit_transform(embeddings.numpy())
 
-    return tsne_embeddings, labels.cpu().numpy()
+    return embeddings.cpu().numpy(), tsne_embeddings, labels.cpu().numpy()
 
 def _get_embeddings_additional(config, ckpt_path, n_tsne = 3):
     model = LightningPLMWrapper.load_from_checkpoint(ckpt_path, config=config)
@@ -100,33 +100,39 @@ def _get_embeddings_additional(config, ckpt_path, n_tsne = 3):
     )
     tsne_embeddings = tsne.fit_transform(embeddings.numpy())
 
-    return tsne_embeddings, labels.cpu().numpy()
+    return embeddings.cpu().numpy(), tsne_embeddings, labels.cpu().numpy()
 
 def _plot_tsne3d(config, file_base: list, file_mixed: list, ckpt_path_base: str, ckpt_path_mixed: str, ckpt_path_add: str):
-    if os.path.exists("logs/tsne/embeddings_base.npy") and os.path.exists("logs/tsne/labels_base.npy"):
-        embeddings_base = np.load("logs/tsne/embeddings_base.npy")
+    if os.path.exists("logs/tsne/embeddings_base_model.npy") and os.path.exists("logs/tsne/labels_base.npy") and os.path.exists("logs/tsne/embeddings_base_tsne.npy"):
+        embeddings_base_model = np.load("logs/tsne/embeddings_base_model.npy")
+        embeddings_base = np.load("logs/tsne/embeddings_base_tsne.npy")
         labels_base = np.load("logs/tsne/labels_base.npy")
     else:
-        embeddings_base, labels_base = _get_embeddings(config, file_base, ckpt_path_base)
-        np.save("logs/tsne/embeddings_base.npy", embeddings_base)
+        embeddings_base_model, embeddings_base, labels_base = _get_embeddings(config, file_base, ckpt_path_base)
+        np.save("logs/tsne/embeddings_base_model.npy", embeddings_base_model)
+        np.save("logs/tsne/embeddings_base_tsne.npy", embeddings_base)
         np.save("logs/tsne/labels_base.npy", labels_base)
     
     config.label_column = config.llm_column
-    if os.path.exists("logs/tsne/embeddings_mixed.npy") and os.path.exists("logs/tsne/labels_mixed.npy"):
-        embeddings_mixed = np.load("logs/tsne/embeddings_mixed.npy")
+    if os.path.exists("logs/tsne/embeddings_mixed_model.npy") and os.path.exists("logs/tsne/embeddings_mixed_tsne.npy") and os.path.exists("logs/tsne/labels_mixed.npy"):
+        embeddings_mixed_model = np.load("logs/tsne/embeddings_mixed_model.npy")
+        embeddings_mixed = np.load("logs/tsne/embeddings_mixed_tsne.npy")
         labels_mixed = np.load("logs/tsne/labels_mixed.npy")
     else:
-        embeddings_mixed, labels_mixed = _get_embeddings(config, file_mixed, ckpt_path_mixed)
-        np.save("logs/tsne/embeddings_mixed.npy", embeddings_mixed)
+        embeddings_mixed_model, embeddings_mixed, labels_mixed = _get_embeddings(config, file_mixed, ckpt_path_mixed)
+        np.save("logs/tsne/embeddings_mixed_model.npy", embeddings_mixed_model)
+        np.save("logs/tsne/embeddings_mixed_tsne.npy", embeddings_mixed)
         np.save("logs/tsne/labels_mixed.npy", labels_mixed)
 
     config.label_column = "empathy" # reset
-    if os.path.exists("logs/tsne/embeddings_add.npy") and os.path.exists("logs/tsne/labels_add.npy"):
-        embeddings_add = np.load("logs/tsne/embeddings_add.npy")
+    if os.path.exists("logs/tsne/embeddings_add_model.npy") and os.path.exists("logs/tsne/embeddings_add_tsne.npy") and os.path.exists("logs/tsne/labels_add.npy"):
+        embeddings_add_model = np.load("logs/tsne/embeddings_add_model.npy")
+        embeddings_add = np.load("logs/tsne/embeddings_add_tsne.npy")
         labels_add = np.load("logs/tsne/labels_add.npy")
     else:
-        embeddings_add, labels_add = _get_embeddings_additional(config, ckpt_path_add)
-        np.save("logs/tsne/embeddings_add.npy", embeddings_add)
+        embeddings_add_model, embeddings_add, labels_add = _get_embeddings_additional(config, ckpt_path_add)
+        np.save("logs/tsne/embeddings_add_model.npy", embeddings_add_model)
+        np.save("logs/tsne/embeddings_add_tsne.npy", embeddings_add)
         np.save("logs/tsne/labels_add.npy", labels_add)
 
     fig = plt.figure(figsize=(14, 6), constrained_layout=False)
@@ -136,7 +142,7 @@ def _plot_tsne3d(config, file_base: list, file_mixed: list, ckpt_path_base: str,
 
     ax1 = fig.add_subplot(131, projection="3d")
 
-    score_base = _tsne3d_metrics(embeddings_base, labels_base)
+    score_base = _tsne3d_metrics(embeddings_base_model, labels_base)
     print(f"Silhouette score (base): {score_base}")
 
     sc_base = ax1.scatter(
@@ -145,7 +151,7 @@ def _plot_tsne3d(config, file_base: list, file_mixed: list, ckpt_path_base: str,
     ax1.set_title("NewsEmp24 Crowdsourced\n" + r"\textbf{Silhouette score: $\mathbf{" + f"{score_base}" + r"}$}")
 
     ax2 = fig.add_subplot(132, projection="3d")
-    score_mixed = _tsne3d_metrics(embeddings_mixed, labels_mixed)
+    score_mixed = _tsne3d_metrics(embeddings_mixed_model, labels_mixed)
     print(f"Silhouette score (mixed): {score_mixed}")
 
     _ = ax2.scatter(
@@ -154,14 +160,13 @@ def _plot_tsne3d(config, file_base: list, file_mixed: list, ckpt_path_base: str,
     ax2.set_title("NewsEmp24 LLM\n" + r"\textbf{Silhouette score: $\mathbf{" + f"{score_mixed}" + r"}$}")
 
     ax3 = fig.add_subplot(133, projection="3d")
-    score_add = _tsne3d_metrics(embeddings_add, labels_add)
+    score_add = _tsne3d_metrics(embeddings_add_model, labels_add)
     print(f"Silhouette score (add): {score_add}")
 
     _ = ax3.scatter(
         embeddings_add[:, 0], embeddings_add[:, 1], embeddings_add[:, 2], c=labels_add, cmap=cmap, norm=norm
     )
     ax3.set_title("NewsEmp24 Crowdsourced + NewsEmp22 LLM\n" + r"\textbf{Silhouette score: $\mathbf{" + f"{score_add}" + r"}$}")
-
 
     for ax in [ax1, ax2, ax3]:
         ax.set_xlabel("t-SNE 1")
@@ -171,7 +176,7 @@ def _plot_tsne3d(config, file_base: list, file_mixed: list, ckpt_path_base: str,
     cbar = fig.colorbar(sc_base, ax=[ax1, ax2, ax3], aspect=50, pad=0.07, location="right", shrink=0.7)
     cbar.set_label("Empathy score")
 
-    plt.savefig("logs/tsne/tsne-3d.pdf")
+    # plt.savefig("logs/tsne/tsne-3d.pdf")
 
 def _plot_tsne2d(config, file_base: list, file_mixed: list, ckpt_path_base: str, ckpt_path_mixed: str):
     embeddings_base, labels_base = _get_embeddings(config, file_base, ckpt_path_base, n_tsne=2)
