@@ -2,11 +2,13 @@ import os
 import torch
 from omegaconf import OmegaConf
 from sklearn.manifold import TSNE
+import numpy as np
+
+from sklearn.metrics import silhouette_score
 
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-import scienceplots
-plt.style.use(['science', 'tableau-colorblind10'])
+# import scienceplots
+# plt.style.use(['science', 'tableau-colorblind10'])
 
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
@@ -38,6 +40,7 @@ def _get_embeddings(config, filepath, ckpt_path, n_tsne = 3):
     labels = []
     with torch.no_grad():
         for batch in dl:
+            batch = {k: v.to(device) for k, v in batch.items() if isinstance(v, torch.Tensor)}
             output = model(batch)
             embeddings.append(output.last_hidden_state[:, 0, :].cpu())
             labels.append(batch["labels"])
@@ -49,13 +52,13 @@ def _get_embeddings(config, filepath, ckpt_path, n_tsne = 3):
         n_components=n_tsne,
         perplexity=30,
         random_state=config.seed,
-        # method="exact",
+        method="exact",
         n_jobs=-1,
         verbose=1
     )
     tsne_embeddings = tsne.fit_transform(embeddings.numpy())
 
-    return tsne_embeddings, labels
+    return tsne_embeddings, labels.cpu().numpy()
 
 def _get_embeddings_additional(config, ckpt_path, n_tsne = 3):
     model = LightningPLMWrapper.load_from_checkpoint(ckpt_path, config=config)
@@ -75,6 +78,7 @@ def _get_embeddings_additional(config, ckpt_path, n_tsne = 3):
     labels = []
     with torch.no_grad():
         for batch in dl:
+            batch = {k: v.to(device) for k, v in batch.items() if isinstance(v, torch.Tensor)}
             output = model(batch)
             embeddings.append(output.last_hidden_state[:, 0, :].cpu())
             labels.append(batch["labels"])
@@ -92,16 +96,34 @@ def _get_embeddings_additional(config, ckpt_path, n_tsne = 3):
     )
     tsne_embeddings = tsne.fit_transform(embeddings.numpy())
 
-    return tsne_embeddings, labels
+    return tsne_embeddings, labels.cpu().numpy()
 
 def _plot_tsne3d(config, file_base: list, file_mixed: list, ckpt_path_base: str, ckpt_path_mixed: str, ckpt_path_add: str):
-    embeddings_base, labels_base = _get_embeddings(config, file_base, ckpt_path_base)
+    if os.path.exists("logs/tsne/embeddings_base.npy") and os.path.exists("logs/tsne/labels_base.npy"):
+        embeddings_base = np.load("logs/tsne/embeddings_base.npy")
+        labels_base = np.load("logs/tsne/labels_base.npy")
+    else:
+        embeddings_base, labels_base = _get_embeddings(config, file_base, ckpt_path_base)
+        np.save("logs/tsne/embeddings_base.npy", embeddings_base)
+        np.save("logs/tsne/labels_base.npy", labels_base)
 
     config.label_column = config.llm_column
-    embeddings_mixed, labels_mixed = _get_embeddings(config, file_mixed, ckpt_path_mixed)
+    if os.path.exists("logs/tsne/embeddings_mixed.npy") and os.path.exists("logs/tsne/labels_mixed.npy"):
+        embeddings_mixed = np.load("logs/tsne/embeddings_mixed.npy")
+        labels_mixed = np.load("logs/tsne/labels_mixed.npy")
+    else:
+        embeddings_mixed, labels_mixed = _get_embeddings(config, file_mixed, ckpt_path_mixed)
+        np.save("logs/tsne/embeddings_mixed.npy", embeddings_mixed)
+        np.save("logs/tsne/labels_mixed.npy", labels_mixed)
 
     config.label_column = "empathy" # reset
-    embeddings_add, labels_add = _get_embeddings_additional(config, ckpt_path_add)
+    if os.path.exists("logs/tsne/embeddings_add.npy") and os.path.exists("logs/tsne/labels_add.npy"):
+        embeddings_add = np.load("logs/tsne/embeddings_add.npy")
+        labels_add = np.load("logs/tsne/labels_add.npy")
+    else:
+        embeddings_add, labels_add = _get_embeddings_additional(config, ckpt_path_add)
+        np.save("logs/tsne/embeddings_add.npy", embeddings_add)
+        np.save("logs/tsne/labels_add.npy", labels_add)
 
     fig = plt.figure(figsize=(14, 6), constrained_layout=False)
 
@@ -110,22 +132,31 @@ def _plot_tsne3d(config, file_base: list, file_mixed: list, ckpt_path_base: str,
 
     ax1 = fig.add_subplot(131, projection="3d")
 
+    score_base = _tsne3d_metrics(embeddings_base, labels_base)
+    print(f"Silhouette score (base): {score_base}")
+
     sc_base = ax1.scatter(
-        embeddings_base[:, 0], embeddings_base[:, 1], embeddings_base[:, 2], c=labels_base.numpy(), cmap=cmap, norm=norm
+        embeddings_base[:, 0], embeddings_base[:, 1], embeddings_base[:, 2], c=labels_base, cmap=cmap, norm=norm
     )
-    ax1.set_title("NewsEmp24 Crowdsourced")
+    ax1.set_title(f"NewsEmp24 Crowdsourced\nSilhouette score: ${score_base:.3f}$")
 
     ax2 = fig.add_subplot(132, projection="3d")
-    sc_mixed = ax2.scatter(
-        embeddings_mixed[:, 0], embeddings_mixed[:, 1], embeddings_mixed[:, 2], c=labels_mixed.numpy(), cmap=cmap, norm=norm
+    score_mixed = _tsne3d_metrics(embeddings_mixed, labels_mixed)
+    print(f"Silhouette score (mixed): {score_mixed}")
+
+    _ = ax2.scatter(
+        embeddings_mixed[:, 0], embeddings_mixed[:, 1], embeddings_mixed[:, 2], c=labels_mixed, cmap=cmap, norm=norm
     )
-    ax2.set_title("NewsEmp24 LLM")
+    ax2.set_title(f"NewsEmp24 LLM\nSilhouette score: ${score_mixed:.3f}$")
 
     ax3 = fig.add_subplot(133, projection="3d")
-    sc_add = ax3.scatter(
-        embeddings_add[:, 0], embeddings_add[:, 1], embeddings_add[:, 2], c=labels_add.numpy(), cmap=cmap, norm=norm
+    score_add = _tsne3d_metrics(embeddings_add, labels_add)
+    print(f"Silhouette score (add): {score_add}")
+
+    _ = ax3.scatter(
+        embeddings_add[:, 0], embeddings_add[:, 1], embeddings_add[:, 2], c=labels_add, cmap=cmap, norm=norm
     )
-    ax3.set_title("NewsEmp24 Crowdsourced + NewsEmp22 LLM")
+    ax3.set_title(f"NewsEmp24 Crowdsourced + NewsEmp22 LLM\nSilhouette score: ${score_add:.3f}$")
 
 
     for ax in [ax1, ax2, ax3]:
@@ -136,7 +167,7 @@ def _plot_tsne3d(config, file_base: list, file_mixed: list, ckpt_path_base: str,
     cbar = fig.colorbar(sc_base, ax=[ax1, ax2, ax3], aspect=50, pad=0.07, location="right", shrink=0.7)
     cbar.set_label("Empathy score")
 
-    plt.savefig("logs/tsne-3d.pdf")
+    plt.savefig("logs/tsne/tsne-3d.pdf")
 
 def _plot_tsne2d(config, file_base: list, file_mixed: list, ckpt_path_base: str, ckpt_path_mixed: str):
     embeddings_base, labels_base = _get_embeddings(config, file_base, ckpt_path_base, n_tsne=2)
@@ -171,6 +202,26 @@ def _plot_tsne2d(config, file_base: list, file_mixed: list, ckpt_path_base: str,
 
     plt.savefig("logs/tsne-2d-2-3.pdf", bbox_inches="tight")
 
+def _variance_of_clusters(embd, label):
+    # on a second thought, this doesn't make sense because embd is basically a point in the 3D space, so, their variance may not reflect the variance of the clusters
+    n_clusters = 6
+    bins = np.linspace(1.0, 7.00001, num=n_clusters+1)
+    bin_indices = np.digitize(label, bins)
+    varianceces = np.zeros(n_clusters)
+    for b in np.unique(bin_indices):
+        idxs = (bin_indices == b)
+        varianceces[b-1] = np.std(embd[idxs], axis=0).mean()
+    # print(f"Variance of each cluster: {varianceces}")
+    return varianceces.mean()
+
+def _tsne3d_metrics(embd, label):
+    n_clusters = 6 # [1.0, 2.0), .[)
+    # Convert continuous labels to discrete clusters by binning
+    bins = np.linspace(1.0, 7 + 1e-6, num=n_clusters+1) # +1e-6 to avoid the last bin being only 7.0
+    label_cluster = np.digitize(label, bins)
+    score = silhouette_score(embd, label_cluster)
+    return score
+
 if __name__ == "__main__":
     os.environ["TOKENIZERS_PARALLELISM"] = "false" 
     
@@ -193,4 +244,3 @@ if __name__ == "__main__":
     config.batch_size = 16
 
     _plot_tsne3d(config, file_base, file_mixed, ckpt_path_base, ckpt_path_mixed, ckpt_path_add)
-    # _plot_tsne2d(config, file_base, file_mixed, ckpt_path_base, ckpt_path_mixed)
