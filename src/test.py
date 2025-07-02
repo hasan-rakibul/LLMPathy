@@ -1,4 +1,5 @@
 import os
+import argparse
 import transformers
 import lightning as L
 from omegaconf import OmegaConf
@@ -96,8 +97,11 @@ def _test_zero_shot(filepath: str, val_goldstandard_filepath: str = None, llm_co
 
 if __name__ == "__main__":
     transformers.logging.set_verbosity_error()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, default="config/config_test.yaml")
+    args = parser.parse_args()
     
-    config_test = OmegaConf.load("config/config_test.yaml")
+    config_test = OmegaConf.load(args.config)
     
     config_common = OmegaConf.load("config/config_common.yaml")
     config = OmegaConf.merge(config_common, config_test)

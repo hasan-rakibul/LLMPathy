@@ -7,6 +7,7 @@ plm: roberta-base
 max_length: 512
 label_column: empathy
 llm_column: llm_empathy
+# llm_column: llm_empathy_plain
 feature_to_tokenise: ["essay"]
 extra_columns_to_keep: []
 

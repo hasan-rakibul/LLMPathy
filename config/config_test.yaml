@@ -8,8 +8,3 @@ test_from_ckpts_parent_dir: logs/20241115_005338_y'(2024,2022)-ImprovedEarlyStop
 
 test_data: [2024]
 test_split: test # test, val, train, etc.; see config/config_common.yaml for more details
-
-#### zero-shot test using LLM
-# test_zero_shot_file: data/NewsEmp2024/trac3_EMP_dev_gpt.tsv
-## goldstand required for some val files (2022 and 2023)
-# val_goldstandard_file: data/NewsEmp2022/goldstandard_dev_2022.tsv

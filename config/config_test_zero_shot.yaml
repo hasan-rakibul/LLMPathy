@@ -1,0 +1,6 @@
+#### zero-shot test using LLM
+
+# Don't forget to check config_common.llm_column
+test_zero_shot_file: data/NewsEmp2024/trac3_EMP_dev_llama_llama_plain.tsv
+## goldstand required for some val files (2022 and 2023)
+# val_goldstandard_file: data/NewsEmp2022/goldstandard_dev_2022.tsv
