@@ -2,18 +2,17 @@ debug_mode: False # will run only 1 epoch of training with 1% of training data, 
 
 save_predictions_to_disk: False # True or False
 
-main_label: y # y' - LLM-GEm; y - vanilla; y_agentic - agentic approach
+main_label: y
 
-train_data: [2022] # for y or y'
+train_data: [2024]
 # train_human_portion: 1.0 # 0.8 means additional 80% of train_data[1:] will be used for training. First element of train_data is always 100% used for training.
-train_only_llm_data: [2024] # for y_llm
-train_only_llm_portion: 1.0 # 0.1 means 10%  will be used for training
+train_only_llm_data: [] # no y_llm data
 
-val_data: 2022 # test would be same as val_data as in in-sample setting
+val_data: 2024 # test would be same as val_data as in in-sample setting
 
-llm: gpt # llama or gpt
+llm: llama # llama or gpt
 
-expt_name_postfix: gpt # postfix to be added on top of main_label, train_data and train_only_llm_data
+expt_name_postfix: llama_deberta # postfix to be added on top of main_label, train_data and train_only_llm_data
 # overwrite_logging_dir: logs/20241117_234401_y'(2024,2023,2022)-Data2022 
 # resume_train_from_checkpoint: logs/20241023_205914_vanilla+2023LLM/lightning_logs/version_17110004/checkpoints/epoch=5-step=378.ckpt
 
@@ -52,11 +51,3 @@ warmup_ratio: 0.06
 # plateau_patience: 1
 # plateau_factor: 0.05
 # plateau_threshold: 1.0e-4
-
-# #### agentic approach
-# updated_train_dl_file: False
-
-# ############ Agentic approach ############
-# noise_level: 0.4
-# num_agents: 3
-# save_agentics_to_disk: True # saves indices and updated train_dl file

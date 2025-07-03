@@ -1,4 +1,5 @@
 import os
+import argparse
 import logging
 import transformers
 import lightning as L
@@ -152,8 +153,12 @@ def _alpha_sweep(config: OmegaConf, do_test: bool) -> None:
 
 if __name__ == "__main__":
     transformers.logging.set_verbosity_error()
-    config_train = OmegaConf.load("config/config_train.yaml")
-    # config_train = OmegaConf.load("config/Giorgi2024Findings.yaml")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, default="config/train_base.yaml")
+    args = parser.parse_args()
+
+    config_train = OmegaConf.load(args.config)
+
     config_common = OmegaConf.load("config/config_common.yaml")
 
     config = OmegaConf.merge(config_common, config_train)
@@ -194,27 +199,5 @@ if __name__ == "__main__":
                 log_info(logger, f"Current lr: {config.lr}, Current batch_size: {config.batch_size}")
                 config.logging_dir = os.path.join(parent_logging_dir, f"lr_{config.lr}_bs_{config.batch_size}")
                 _alpha_sweep(config, do_test=config.do_test)
-    
-    elif config.main_label == "y_agentic":
-        from agentic_noise_removal import agentic_noise_removal
-        if config.updated_train_dl_file:
-            assert os.path.exists(config.updated_train_dl_file), f"Updated train_dl file not found at {config.updated_train_dl_file}"
-            train_dl = torch.load(config.updated_train_dl_file, weights_only=False)
-            log_info(logger, f"Loaded updated train_dl from {config.updated_train_dl_file}")
-            config.logging_dir = os.path.dirname(config.updated_train_dl_file)
-        else:
-            log_info(logger, "No updated train_dl file found. So, training from scratch.")
-            config.batch_size = config.batch_sizes[0] # only the first batch_size is used for agentic
-            config.lr = config.lrs[0] # only the first lr is used for agentic
-            train_dl = agentic_noise_removal(config)
-
-        parent_logging_dir = config.logging_dir
-        for lr in config.lrs:
-            config.lr = lr
-            for batch_size in config.batch_sizes:
-                config.batch_size = batch_size
-                log_info(logger, f"Current lr: {config.lr}, Current batch_size: {config.batch_size}")
-                config.logging_dir = os.path.join(parent_logging_dir, f"lr_{config.lr}_bs_{config.batch_size}")
-                _seeds_sweep(config, do_test=config.do_test, train_dl=train_dl)
     else:
         raise ValueError(f"main_label must be either y or y'. Found {config.main_label}")

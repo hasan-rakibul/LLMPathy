@@ -20,14 +20,3 @@ tenacity
 #plotly # for visualisation
 #kaleido # for visualisation
 
-## LoRA
-# sentencepiece
-# peft
-# evaluate
-
-## wordcloud
-# wordcloud
-
-## agentic workflow
-# crewai
-# langchain-huggingface

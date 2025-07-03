@@ -1,5 +1,10 @@
 
 
+# Some of the important configurations
+- `config/config_common.yaml` primarily includes configs that are common across train and test.
+     - The pre-trained model is to be specified here.
+     - The name of the columns to be supplied here to specify which one is LLM-generated and which one is the crowdsourced labels.
+
 # Test
 ```bash
 # configure the path in `config/config_test.yaml`

@@ -1,7 +1,8 @@
 # common between train and test
 seeds: [0, 42, 100, 999, 1234]
 num_workers: 12
-plm: roberta-base
+# plm: roberta-base
+plm: microsoft/deberta-v3-base
 # plm: siebert/sentiment-roberta-large-english
 
 max_length: 512
