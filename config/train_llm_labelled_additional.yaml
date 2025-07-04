@@ -4,16 +4,16 @@ save_predictions_to_disk: False # True or False
 
 main_label: y
 
-train_data: [2022] # for y or y'
+train_data: [2024] # for y or y'
 # train_human_portion: 1.0 # 0.8 means additional 80% of train_data[1:] will be used for training. First element of train_data is always 100% used for training.
-train_only_llm_data: [2024] # for y_llm
+train_only_llm_data: [2022] # for y_llm
 train_only_llm_portion: 1.0 # 0.1 means 10%  will be used for training
 
-val_data: 2022 # test would be same as val_data as in in-sample setting
+val_data: 2024 # test would be same as val_data as in in-sample setting
 
-llm: llama # llama or gpt
+llm: gpt # llama or gpt
 
-expt_name_postfix: llama # postfix to be added on top of main_label, train_data and train_only_llm_data
+expt_name_postfix: gpt_deberta # postfix to be added on top of main_label, train_data and train_only_llm_data
 # overwrite_logging_dir: logs/20241117_234401_y'(2024,2023,2022)-Data2022 
 # resume_train_from_checkpoint: logs/20241023_205914_vanilla+2023LLM/lightning_logs/version_17110004/checkpoints/epoch=5-step=378.ckpt
 

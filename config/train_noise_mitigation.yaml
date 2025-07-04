@@ -10,9 +10,9 @@ train_only_llm_data: [] # no y_llm data
 
 val_data: 2024 # test would be same as val_data as in in-sample setting
 
-llm: llama # llama or gpt
+llm: gpt # llama or gpt
 
-expt_name_postfix: llama_deberta # postfix to be added on top of main_label, train_data and train_only_llm_data
+expt_name_postfix: gpt_deberta # postfix to be added on top of main_label, train_data and train_only_llm_data
 # overwrite_logging_dir: logs/20241117_234401_y'(2024,2023,2022)-Data2022 
 # resume_train_from_checkpoint: logs/20241023_205914_vanilla+2023LLM/lightning_logs/version_17110004/checkpoints/epoch=5-step=378.ckpt
 

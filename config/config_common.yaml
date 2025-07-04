@@ -33,7 +33,9 @@ use_demographics: False
 2022:
     train: data/NewsEmp2022/messages_train_ready_for_WS.tsv
     train_llama: data/NewsEmp2022/messages_train_ready_for_WS_llama.tsv
+    train_gpt: data/NewsEmp2022/messages_train_ready_for_WS_gpt.tsv
     val: data/NewsEmp2022/messages_dev_features_ready_for_WS_2022.tsv
     val_llama: data/NewsEmp2022/messages_dev_features_ready_for_WS_2022_llama.tsv
+    val_gpt: data/NewsEmp2022/messages_dev_features_ready_for_WS_2022_gpt.tsv
     test: data/NewsEmp2022/messages_test_features_ready_for_WS_2022.tsv
     
