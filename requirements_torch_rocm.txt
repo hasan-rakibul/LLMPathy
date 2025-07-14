@@ -1,3 +1,2 @@
 --index-url https://download.pytorch.org/whl/rocm6.1
 torch==2.4.1
-# torchvision # if using UCVME
