@@ -19,12 +19,13 @@ def _make_latex_table_row(path: str) -> None:
         
     best_scores = pd.DataFrame(index=["best"], columns=columns)
     for col in results_only.columns:
+        print(col)
         if col.endswith("_rmse"):
-            best_scores.loc["best", col] = df[col].min()
+            best_scores.loc["best", col] = results_only[col].min().round(3)
         else:
-            best_scores.loc["best", col] = df[col].max()
+            best_scores.loc["best", col] = results_only[col].max().round(3)
 
-    best_row = best_scores.loc["best", :].round(3)
+    best_row = best_scores.loc["best", :]
 
     print(" & ".join(columns))
 
