@@ -1,7 +1,9 @@
 # include things we need
+- **/.DS_Store
 + OTHERS/**
 - data/llm-generated-labels/**
 + data/**
+- .git/**
 + logs/**
 + output/**
 + tmp/**
