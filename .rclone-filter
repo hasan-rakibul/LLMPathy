@@ -1,5 +1,6 @@
 # include things we need
 + OTHERS/**
+- data/llm-generated-labels/**
 + data/**
 + logs/**
 + output/**

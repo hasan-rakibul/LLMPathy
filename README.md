@@ -33,15 +33,26 @@
 We discovered a few minor errors in reporting of the _peak_ RMSE scores (the minimum RMSE value selected from three runs), which affected Tables V and VIII of the published paper. The corrected tables are provided below, which shows our approach is even better than what we claimed in the published versions available on IEEE Xplore and arXiv.
 
 <div align="center">
-<p align="left">Table V shows that our noise mitigation approach outperforms the baseline across all experiment configurations: median and peak scores of PCCs, CCCs and RMSEs across <i>all four</i> data and PLM setups:</p>
+<p align="left">Table V shows that our noise mitigation approach outperforms the baseline across all experiment configurations: median and peak scores of PCCs, CCCs and RMSEs across <i>all four</i> data and PLM setups (some values on the last columns, which are inside () brackets, are updated):</p>
     <img src="table-v.png" width="400">
 </div>
 
 <div align="center">
 &nbsp;
-<p align="left">Table VIII shows that our approach outperforms Giorgi et al. [37]’s results in terms of <i>all three</i> evaluation metrics:</p>
+<p align="left">Table VIII shows that our approach outperforms Giorgi et al. [37]’s results in terms of <i>all three</i> evaluation metrics (two values in the last columns are updated):</p>
     <img src="table-viii.png" width="400">
 </div>
+
+## LLM-generated labels
+
+The LLM-generated labels used in our paper are available in the `data/llm-generated-labels` directory. Each file contains the generated labels together with the corresponding instance identifiers for the relevant dataset (e.g., message IDs, article IDs, speaker IDs, etc.).
+
+Note that the public datasets we used restrict redistribution of the datasets, so we could not include the full datasets here in this repository. Instead, we provide the LLM-generated labels aligned with the original dataset IDs, so they can be easily matched back to the source data.
+
+The original datasets can be obtained from:
+- [NewsEmp22 dataset](https://codalab.lisn.upsaclay.fr/competitions/834#learn_the_details-datasets)
+- [NewsEmp23 dataset](https://codalab.lisn.upsaclay.fr/competitions/11167#learn_the_details-datasets)
+- [NewsEmp24 dataset](https://codalab.lisn.upsaclay.fr/competitions/18810#learn_the_details-datasets)
 
 ## How to use this repository
 
@@ -77,10 +88,6 @@ python src/test.py
 
 At most cases, combination of the above scenarios are used.
 - y(202x)+y_llm(202y): 2nd application scenario. E.g., `logs/20241230_095259_y(2022)-y_llm(2024)-gpt` means NewsEmp24 + GPT-labelled NewsEmp22 (Table III)
-
-
-## To do
-- [ ] Make LLM-generated labels available in this repository.
 
 
 ## Citation

@@ -1,5 +1,8 @@
 OTHERS/
-data/
+
+data/*
+!data/llm-generated-labels/
+
 logs/
 output/
 tmp/
