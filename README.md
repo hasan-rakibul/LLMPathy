@@ -9,7 +9,7 @@
     <a href="https://arxiv.org/abs/2501.00691">
         <img src="https://img.shields.io/badge/arXiv-2501.00691-b31b1b.svg?style=flat-square">
     </a>
-    <a href="https://arxiv.org/pdf/2501.00691">
+    <a href="https://hasan-rakibul.github.io/pdfs/hasan2026labels.pdf">
         <img src="https://img.shields.io/badge/PDF-paper-b31b1b.svg?style=flat-square">
     </a>
     <a href="https://github.com/hasan-rakibul/LLMPathy/stargazers">
